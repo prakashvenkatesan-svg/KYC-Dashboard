@@ -58,7 +58,27 @@ const loadClients = async () => {
   const integrationFilter = document.getElementById('integration-filter').value;
   const statusFilter = document.getElementById('status-filter').value;
   
-  tbody.innerHTML = '<tr><td colspan="10" style="text-align: center;">Loading...</td></tr>';
+  // Toggle header visibility
+  const showNse = !integrationFilter || integrationFilter === 'nse';
+  const showBse = !integrationFilter || integrationFilter === 'bse';
+  const showCvlkra = !integrationFilter || integrationFilter === 'cvlkra';
+  const showCdsl = !integrationFilter || integrationFilter === 'cdsl';
+  const showTechexcel = !integrationFilter || integrationFilter === 'techexcel';
+  
+  const theadNse = document.querySelector('th.col-nse');
+  const theadBse = document.querySelector('th.col-bse');
+  const theadCvlkra = document.querySelector('th.col-cvlkra');
+  const theadCdsl = document.querySelector('th.col-cdsl');
+  const theadTechexcel = document.querySelector('th.col-techexcel');
+  
+  if (theadNse) theadNse.style.display = showNse ? '' : 'none';
+  if (theadBse) theadBse.style.display = showBse ? '' : 'none';
+  if (theadCvlkra) theadCvlkra.style.display = showCvlkra ? '' : 'none';
+  if (theadCdsl) theadCdsl.style.display = showCdsl ? '' : 'none';
+  if (theadTechexcel) theadTechexcel.style.display = showTechexcel ? '' : 'none';
+  
+  const colCount = !integrationFilter ? 10 : 6;
+  tbody.innerHTML = `<tr><td colspan="${colCount}" style="text-align: center;">Loading...</td></tr>`;
   
   try {
     const offset = (currentPage - 1) * limit;
@@ -89,7 +109,7 @@ const loadClients = async () => {
     tbody.innerHTML = '';
     
     if (clients.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="10" style="text-align: center;">No clients found</td></tr>';
+      tbody.innerHTML = `<tr><td colspan="${colCount}" style="text-align: center;">No clients found</td></tr>`;
       return;
     }
     
@@ -105,18 +125,18 @@ const loadClients = async () => {
         <td>${client.pan_number || 'N/A'}</td>
         <td>${client.email || 'N/A'}</td>
         <td>${client.mobile_number || 'N/A'}</td>
-        <td>${renderStatusBadge(client.nse_push_status, client.nse_rejection_reason)}</td>
-        <td>${renderStatusBadge(client.bse_push_status, client.bse_rejection_reason)}</td>
-        <td>${renderStatusBadge(client.cvlkra_sync_status, client.cvlkra_rejection_reason)}</td>
-        <td>${renderStatusBadge(client.cdsl_push_status, client.cdsl_rejection_reason)}</td>
-        <td>${renderStatusBadge(client.techexcel_push_status, client.techexcel_rejection_reason)}</td>
+        ${showNse ? `<td>${renderStatusBadge(client.nse_push_status, client.nse_rejection_reason)}</td>` : ''}
+        ${showBse ? `<td>${renderStatusBadge(client.bse_push_status, client.bse_rejection_reason)}</td>` : ''}
+        ${showCvlkra ? `<td>${renderStatusBadge(client.cvlkra_sync_status, client.cvlkra_rejection_reason)}</td>` : ''}
+        ${showCdsl ? `<td>${renderStatusBadge(client.cdsl_push_status, client.cdsl_rejection_reason)}</td>` : ''}
+        ${showTechexcel ? `<td>${renderStatusBadge(client.techexcel_push_status, client.techexcel_rejection_reason)}</td>` : ''}
       `;
       
       tbody.appendChild(tr);
     });
     
   } catch (error) {
-    tbody.innerHTML = `<tr><td colspan="10" style="text-align: center; color: red;">Failed to load clients</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="${colCount}" style="text-align: center; color: red;">Failed to load clients</td></tr>`;
     console.error(error);
   }
 };

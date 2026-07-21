@@ -209,7 +209,8 @@
           // Redirect to dashboard
           window.location.href = 'dashboard.html';
         } else {
-          errorMsg.textContent = data.message || 'Invalid credentials';
+          const detail = data.error ? ` (${data.error})` : '';
+          errorMsg.textContent = (data.message || 'Invalid credentials') + detail;
           errorMsg.style.display = 'block';
           btn.disabled = false;
           btnText.style.display = 'block';

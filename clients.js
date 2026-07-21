@@ -91,7 +91,7 @@ const loadClients = async () => {
   if (theadTechexcel) theadTechexcel.style.display = showTechexcel ? '' : 'none';
   if (theadTechexcelReason) theadTechexcelReason.style.display = (integrationFilter === 'techexcel') ? '' : 'none';
   
-  const colCount = !integrationFilter ? 10 : 7;
+  const colCount = !integrationFilter ? 11 : 8;
   tbody.innerHTML = `<tr><td colspan="${colCount}" style="text-align: center;">Loading...</td></tr>`;
   
   try {
@@ -133,7 +133,10 @@ const loadClients = async () => {
         window.location.href = `client-detail.html?code=${client.client_code}`;
       };
       
+      const appDate = client.application_date ? new Date(client.application_date).toLocaleDateString('en-GB') : 'N/A';
+      
       tr.innerHTML = `
+        <td>${appDate}</td>
         <td><strong>${client.client_code || 'N/A'}</strong></td>
         <td>${client.client_name || 'Unknown'}</td>
         <td>${client.pan_number || 'N/A'}</td>

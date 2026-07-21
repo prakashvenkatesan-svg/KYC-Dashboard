@@ -35,7 +35,7 @@ document.addEventListener('DOMContentLoaded', async () => {
           </div>
         </div>
         <div class="card-action">
-          <a href="integration.html?name=${encodeURIComponent(integration.toLowerCase().replace(' ', ''))}" class="view-link">View Records ➔</a>
+          <a href="${integration.toLowerCase().replace(' ', '')}.html" class="view-link">View Records ➔</a>
         </div>
       `;
       container.appendChild(card);

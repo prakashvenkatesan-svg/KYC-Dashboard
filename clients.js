@@ -4,10 +4,42 @@ let totalRecords = 0;
 
 document.addEventListener('DOMContentLoaded', () => {
   const urlParams = new URLSearchParams(window.location.search);
-  const initialIntegration = urlParams.get('integration');
+  let initialIntegration = urlParams.get('integration');
+  const path = window.location.pathname.toLowerCase();
+  
+  if (!initialIntegration) {
+    if (path.includes('nse.html')) initialIntegration = 'nse';
+    else if (path.includes('bse.html')) initialIntegration = 'bse';
+    else if (path.includes('cvlkra.html')) initialIntegration = 'cvlkra';
+    else if (path.includes('cdsl.html')) initialIntegration = 'cdsl';
+    else if (path.includes('techexcel.html')) initialIntegration = 'techexcel';
+  }
   
   if (initialIntegration) {
-    document.getElementById('integration-filter').value = initialIntegration.toLowerCase();
+    // Auth & Permissions check
+    const userStr = localStorage.getItem('kyc_user');
+    if (userStr) {
+      try {
+        const user = JSON.parse(userStr);
+        const mods = user.modules || [];
+        const moduleMap = { 'nse': 'NSE', 'bse': 'BSE', 'cvlkra': 'CVL KRA', 'cdsl': 'CDSL', 'techexcel': 'TechExcel' };
+        const requiredModule = moduleMap[initialIntegration.toLowerCase()];
+        
+        if (user.role !== 'Admin' && !mods.includes(requiredModule)) {
+          alert('Unauthorized access. You do not have permission to view ' + requiredModule + ' records.');
+          window.location.href = 'dashboard.html';
+          return;
+        }
+      } catch(e) {}
+    }
+    
+    const filterDropdown = document.getElementById('integration-filter');
+    if (filterDropdown) {
+      filterDropdown.value = initialIntegration.toLowerCase();
+      filterDropdown.disabled = true; // Lock dropdown for dedicated pages
+      filterDropdown.style.opacity = '0.7';
+      filterDropdown.style.cursor = 'not-allowed';
+    }
     document.getElementById('page-title').textContent = `${initialIntegration.toUpperCase()} - Client Listing`;
   }
   
@@ -25,7 +57,12 @@ document.addEventListener('DOMContentLoaded', () => {
   
   document.getElementById('reset-btn').addEventListener('click', () => {
     document.getElementById('search-input').value = '';
-    document.getElementById('integration-filter').value = '';
+    
+    const filterDropdown = document.getElementById('integration-filter');
+    if (!filterDropdown.disabled) {
+      filterDropdown.value = '';
+    }
+    
     document.getElementById('status-filter').value = '';
     document.getElementById('from-date').value = '';
     document.getElementById('to-date').value = '';

@@ -14,19 +14,19 @@ const sidebarHTML = `
       <a href="clients.html" class="nav-link" id="nav-clients">
         <i class="icon">👥</i> Clients
       </a>
-      <a href="clients.html?integration=nse" class="nav-link" id="nav-nse">
+      <a href="nse.html" class="nav-link" id="nav-nse">
         <i class="icon">🔗</i> NSE
       </a>
-      <a href="clients.html?integration=bse" class="nav-link" id="nav-bse">
+      <a href="bse.html" class="nav-link" id="nav-bse">
         <i class="icon">🔗</i> BSE
       </a>
-      <a href="clients.html?integration=cvlkra" class="nav-link" id="nav-cvlkra">
+      <a href="cvlkra.html" class="nav-link" id="nav-cvlkra">
         <i class="icon">🔗</i> CVL KRA
       </a>
-      <a href="clients.html?integration=cdsl" class="nav-link" id="nav-cdsl">
+      <a href="cdsl.html" class="nav-link" id="nav-cdsl">
         <i class="icon">🔗</i> CDSL
       </a>
-      <a href="clients.html?integration=techexcel" class="nav-link" id="nav-techexcel">
+      <a href="techexcel.html" class="nav-link" id="nav-techexcel">
         <i class="icon">🔗</i> TechExcel
       </a>
     </nav>
@@ -81,9 +81,17 @@ function renderSidebar() {
         link.classList.add('active');
       } else if (linkHref === 'users.html' && path.includes('users.html')) {
         link.classList.add('active');
-      } else if (linkHref === 'clients.html' && path.includes('clients.html') && !search.includes('integration=')) {
+      } else if (linkHref === 'clients.html' && path.includes('clients.html')) {
         link.classList.add('active');
-      } else if (path.includes('clients.html') && search.includes('integration=') && linkHref.includes(search)) {
+      } else if (linkHref === 'nse.html' && path.includes('nse.html')) {
+        link.classList.add('active');
+      } else if (linkHref === 'bse.html' && path.includes('bse.html')) {
+        link.classList.add('active');
+      } else if (linkHref === 'cvlkra.html' && path.includes('cvlkra.html')) {
+        link.classList.add('active');
+      } else if (linkHref === 'cdsl.html' && path.includes('cdsl.html')) {
+        link.classList.add('active');
+      } else if (linkHref === 'techexcel.html' && path.includes('techexcel.html')) {
         link.classList.add('active');
       }
     });

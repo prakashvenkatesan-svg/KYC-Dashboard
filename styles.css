@@ -110,6 +110,7 @@ body {
   padding: 32px 48px;
   display: flex;
   flex-direction: column;
+  min-width: 0; /* Critical for horizontal scroll inside flex item */
 }
 
 .top-header {

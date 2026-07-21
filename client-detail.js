@@ -141,11 +141,11 @@ document.addEventListener('DOMContentLoaded', async () => {
           
           try {
             const token = localStorage.getItem('kyc_token');
-            const res = await fetch(\`/api/kyc-dashboard/clients/\${clientCode}/skip-payment\`, {
+            const res = await fetch(`/api/kyc-dashboard/clients/${clientCode}/skip-payment`, {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
-                'Authorization': \`Bearer \${token}\`
+                'Authorization': `Bearer ${token}`
               },
               body: JSON.stringify({ skip_reason: reason })
             });

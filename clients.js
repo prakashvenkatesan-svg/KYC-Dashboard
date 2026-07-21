@@ -66,18 +66,32 @@ const loadClients = async () => {
   const showTechexcel = !integrationFilter || integrationFilter === 'techexcel';
   
   const theadNse = document.querySelector('th.col-nse');
+  const theadNseReason = document.querySelector('th.col-nse-reason');
   const theadBse = document.querySelector('th.col-bse');
+  const theadBseReason = document.querySelector('th.col-bse-reason');
   const theadCvlkra = document.querySelector('th.col-cvlkra');
+  const theadCvlkraReason = document.querySelector('th.col-cvlkra-reason');
   const theadCdsl = document.querySelector('th.col-cdsl');
+  const theadCdslReason = document.querySelector('th.col-cdsl-reason');
   const theadTechexcel = document.querySelector('th.col-techexcel');
+  const theadTechexcelReason = document.querySelector('th.col-techexcel-reason');
   
   if (theadNse) theadNse.style.display = showNse ? '' : 'none';
-  if (theadBse) theadBse.style.display = showBse ? '' : 'none';
-  if (theadCvlkra) theadCvlkra.style.display = showCvlkra ? '' : 'none';
-  if (theadCdsl) theadCdsl.style.display = showCdsl ? '' : 'none';
-  if (theadTechexcel) theadTechexcel.style.display = showTechexcel ? '' : 'none';
+  if (theadNseReason) theadNseReason.style.display = (integrationFilter === 'nse') ? '' : 'none';
   
-  const colCount = !integrationFilter ? 10 : 6;
+  if (theadBse) theadBse.style.display = showBse ? '' : 'none';
+  if (theadBseReason) theadBseReason.style.display = (integrationFilter === 'bse') ? '' : 'none';
+  
+  if (theadCvlkra) theadCvlkra.style.display = showCvlkra ? '' : 'none';
+  if (theadCvlkraReason) theadCvlkraReason.style.display = (integrationFilter === 'cvlkra') ? '' : 'none';
+  
+  if (theadCdsl) theadCdsl.style.display = showCdsl ? '' : 'none';
+  if (theadCdslReason) theadCdslReason.style.display = (integrationFilter === 'cdsl') ? '' : 'none';
+  
+  if (theadTechexcel) theadTechexcel.style.display = showTechexcel ? '' : 'none';
+  if (theadTechexcelReason) theadTechexcelReason.style.display = (integrationFilter === 'techexcel') ? '' : 'none';
+  
+  const colCount = !integrationFilter ? 10 : 7;
   tbody.innerHTML = `<tr><td colspan="${colCount}" style="text-align: center;">Loading...</td></tr>`;
   
   try {
@@ -126,10 +140,15 @@ const loadClients = async () => {
         <td>${client.email || 'N/A'}</td>
         <td>${client.mobile_number || 'N/A'}</td>
         ${showNse ? `<td>${renderStatusBadge(client.nse_push_status, client.nse_rejection_reason)}</td>` : ''}
+        ${integrationFilter === 'nse' ? `<td style="color: #dc3545; font-size: 0.85em;">${client.nse_rejection_reason || '-'}</td>` : ''}
         ${showBse ? `<td>${renderStatusBadge(client.bse_push_status, client.bse_rejection_reason)}</td>` : ''}
+        ${integrationFilter === 'bse' ? `<td style="color: #dc3545; font-size: 0.85em;">${client.bse_rejection_reason || '-'}</td>` : ''}
         ${showCvlkra ? `<td>${renderStatusBadge(client.cvlkra_sync_status, client.cvlkra_rejection_reason)}</td>` : ''}
+        ${integrationFilter === 'cvlkra' ? `<td style="color: #dc3545; font-size: 0.85em;">${client.cvlkra_rejection_reason || '-'}</td>` : ''}
         ${showCdsl ? `<td>${renderStatusBadge(client.cdsl_push_status, client.cdsl_rejection_reason)}</td>` : ''}
+        ${integrationFilter === 'cdsl' ? `<td style="color: #dc3545; font-size: 0.85em;">${client.cdsl_rejection_reason || '-'}</td>` : ''}
         ${showTechexcel ? `<td>${renderStatusBadge(client.techexcel_push_status, client.techexcel_rejection_reason)}</td>` : ''}
+        ${integrationFilter === 'techexcel' ? `<td style="color: #dc3545; font-size: 0.85em;">${client.techexcel_rejection_reason || '-'}</td>` : ''}
       `;
       
       tbody.appendChild(tr);

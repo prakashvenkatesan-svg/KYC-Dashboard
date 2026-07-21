@@ -58,7 +58,7 @@ const loadClients = async () => {
   const integrationFilter = document.getElementById('integration-filter').value;
   const statusFilter = document.getElementById('status-filter').value;
   
-  tbody.innerHTML = '<tr><td colspan="8" style="text-align: center;">Loading...</td></tr>';
+  tbody.innerHTML = '<tr><td colspan="10" style="text-align: center;">Loading...</td></tr>';
   
   try {
     const offset = (currentPage - 1) * limit;
@@ -89,34 +89,34 @@ const loadClients = async () => {
     tbody.innerHTML = '';
     
     if (clients.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="8" style="text-align: center;">No clients found</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="10" style="text-align: center;">No clients found</td></tr>';
       return;
     }
     
     clients.forEach(client => {
       const tr = document.createElement('tr');
       tr.onclick = () => {
-        window.location.href = \`client-detail.html?code=\${client.client_code}\`;
+        window.location.href = `client-detail.html?code=${client.client_code}`;
       };
       
-      const dateStr = client.last_updated ? new Date(client.last_updated).toLocaleString() : 'N/A';
-      
-      tr.innerHTML = \`
-        <td><strong>\${client.client_code || 'N/A'}</strong><br><small>\${client.pan_number || ''}</small></td>
-        <td>\${client.client_name || 'Unknown'}<br><small>\${client.email || ''}</small></td>
-        <td>\${renderStatusBadge(client.nse_push_status, client.nse_rejection_reason)}</td>
-        <td>\${renderStatusBadge(client.bse_push_status, client.bse_rejection_reason)}</td>
-        <td>\${renderStatusBadge(client.cvlkra_sync_status, client.cvlkra_rejection_reason)}</td>
-        <td>\${renderStatusBadge(client.cdsl_push_status, client.cdsl_rejection_reason)}</td>
-        <td>\${renderStatusBadge(client.techexcel_push_status, client.techexcel_rejection_reason)}</td>
-        <td><small>\${dateStr}</small></td>
-      \`;
+      tr.innerHTML = `
+        <td><strong>${client.client_code || 'N/A'}</strong></td>
+        <td>${client.client_name || 'Unknown'}</td>
+        <td>${client.pan_number || 'N/A'}</td>
+        <td>${client.email || 'N/A'}</td>
+        <td>${client.mobile_number || 'N/A'}</td>
+        <td>${renderStatusBadge(client.nse_push_status, client.nse_rejection_reason)}</td>
+        <td>${renderStatusBadge(client.bse_push_status, client.bse_rejection_reason)}</td>
+        <td>${renderStatusBadge(client.cvlkra_sync_status, client.cvlkra_rejection_reason)}</td>
+        <td>${renderStatusBadge(client.cdsl_push_status, client.cdsl_rejection_reason)}</td>
+        <td>${renderStatusBadge(client.techexcel_push_status, client.techexcel_rejection_reason)}</td>
+      `;
       
       tbody.appendChild(tr);
     });
     
   } catch (error) {
-    tbody.innerHTML = \`<tr><td colspan="8" style="text-align: center; color: red;">Failed to load clients</td></tr>\`;
+    tbody.innerHTML = `<tr><td colspan="10" style="text-align: center; color: red;">Failed to load clients</td></tr>`;
     console.error(error);
   }
 };

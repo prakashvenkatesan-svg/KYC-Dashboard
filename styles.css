@@ -116,7 +116,7 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 52px; /* Increased to keep table position fixed */
+  margin-bottom: 20px; /* Reduced to bring client table card up */
 }
 
 .top-header h1 {

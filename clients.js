@@ -212,7 +212,11 @@ const loadClients = async () => {
     
     clients.forEach(client => {
       const tr = document.createElement('tr');
-      tr.onclick = () => {
+      tr.onclick = (e) => {
+        if (!client.client_code) {
+          alert("Client details cannot be loaded because the Client Code is not yet generated.");
+          return;
+        }
         window.location.href = `client-detail.html?code=${client.client_code}`;
       };
       

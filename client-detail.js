@@ -7,8 +7,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   const user = JSON.parse(localStorage.getItem('kyc_user') || '{}');
   const isAdmin = user.role === 'Admin';
 
-  if (!clientCode) {
-    grid.innerHTML = '<div class="error-msg">No client code provided.</div>';
+  if (!clientCode || clientCode === 'null') {
+    grid.innerHTML = '<div class="error-msg">No valid client code provided.</div>';
     return;
   }
 

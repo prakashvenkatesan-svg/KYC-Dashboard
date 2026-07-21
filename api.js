@@ -1,4 +1,4 @@
-const API_BASE_URL = '/admin/kyc-dashboard';
+const API_BASE_URL = 'https://xvbefkfln5.execute-api.ap-south-1.amazonaws.com/admin/kyc-dashboard';
 
 // We assume there's a global token or cookie for auth since it's an admin panel.
 // We'll simulate sending an authorization header if a token is in localStorage.

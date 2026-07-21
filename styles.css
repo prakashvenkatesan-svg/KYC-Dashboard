@@ -324,6 +324,7 @@ tbody tr:hover {
 .status-Pending { background: rgba(245, 158, 11, 0.15); color: #FBBF24; }
 .status-Rejected { background: rgba(239, 68, 68, 0.15); color: #F87171; }
 .status-Failed { background: rgba(239, 68, 68, 0.15); color: #F87171; }
+.status-Skipped { background: rgba(167, 139, 250, 0.15); color: #C084FC; }
 
 .rejection-reason {
   display: block;

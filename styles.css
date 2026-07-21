@@ -107,7 +107,7 @@ body {
 .main-content {
   margin-left: 260px;
   width: calc(100vw - 260px);
-  padding: 24px 24px;
+  padding: 12px 24px 24px; /* Reduced top padding */
   display: flex;
   flex-direction: column;
 }
@@ -116,7 +116,7 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 40px;
+  margin-bottom: 52px; /* Increased to keep table position fixed */
 }
 
 .top-header h1 {

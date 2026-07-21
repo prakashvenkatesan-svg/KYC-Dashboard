@@ -17,26 +17,8 @@ const initAuth = () => {
   if (!token || !userStr) {
     if (window.location.pathname.includes('login.html')) return;
     
-    // Quick prompt for login if not on login page
-    const username = prompt("Username:");
-    if (!username) return;
-    const password = prompt("Password:");
-    
-    fetch(`${API_BASE_URL}/login`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username, password })
-    })
-    .then(r => r.json())
-    .then(data => {
-      if (data.success) {
-        localStorage.setItem('kyc_auth_token', data.token);
-        localStorage.setItem('kyc_user', JSON.stringify(data.user));
-        location.reload();
-      } else {
-        alert('Login failed: ' + data.message);
-      }
-    });
+    // Redirect to login page if not logged in
+    window.location.href = 'login.html';
   } else {
     // Populate user UI if elements exist
     const user = JSON.parse(userStr);

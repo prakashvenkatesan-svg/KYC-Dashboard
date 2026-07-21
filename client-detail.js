@@ -6,8 +6,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Auth checks for skip payment
   const user = JSON.parse(localStorage.getItem('kyc_user') || '{}');
   const isAdmin = user.role === 'Admin';
-  const clientCode = urlParams.get('code');
-  const grid = document.getElementById('integrations-grid');
 
   if (!clientCode) {
     grid.innerHTML = '<div class="error-msg">No client code provided.</div>';

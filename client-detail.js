@@ -84,8 +84,16 @@ document.addEventListener('DOMContentLoaded', async () => {
       const capStatus = pStatus.charAt(0).toUpperCase() + pStatus.slice(1).toLowerCase();
       
       let skipBtnHtml = '';
+      let bypassBtnHtml = '';
+      
       if (isAdmin && ['pending', 'failed'].includes(pStatus.toLowerCase())) {
         skipBtnHtml = `<button id="skip-payment-trigger" style="margin-top:16px; padding:6px 12px; background:var(--primary-color); border:none; border-radius:4px; color:white; cursor:pointer; width:100%;">Skip Payment</button>`;
+      }
+      
+      if (isAdmin && pStatus.toLowerCase() === 'success' && !payInfo.payment_bypass_allowed) {
+        bypassBtnHtml = `<button id="bypass-payment-trigger" style="margin-top:16px; padding:6px 12px; background:#10B981; border:none; border-radius:4px; color:white; cursor:pointer; width:100%; font-weight:bold;">Allow Payment Bypass</button>`;
+      } else if (payInfo.payment_bypass_allowed) {
+        bypassBtnHtml = `<button disabled style="margin-top:16px; padding:6px 12px; background:#334155; border:none; border-radius:4px; color:#94a3b8; width:100%; cursor:not-allowed;">Payment Bypass Approved</button>`;
       }
       
       let skipAuditHtml = '';
@@ -99,6 +107,20 @@ document.addEventListener('DOMContentLoaded', async () => {
           </div>
         `;
       }
+      
+      let bypassAuditHtml = '';
+      if (payInfo.payment_bypass_allowed) {
+        const bypassDate = payInfo.payment_bypass_approved_at ? new Date(payInfo.payment_bypass_approved_at).toLocaleString() : 'N/A';
+        bypassAuditHtml = `
+          <div style="margin-top:12px; padding-top:12px; border-top:1px solid var(--surface-border);">
+            <div class="detail-row"><span class="label" style="color:#10B981;">Journey Bypass</span><span class="value" style="color:#10B981; font-weight:bold;">Approved</span></div>
+            <div class="detail-row"><span class="label">Approved By</span><span class="value">${payInfo.payment_bypass_approved_by || 'Unknown'}</span></div>
+            <div class="detail-row"><span class="label">Approved At</span><span class="value">${bypassDate}</span></div>
+            <div class="detail-row"><span class="label">RM Ref</span><span class="value" style="font-size:0.8rem;">${payInfo.payment_bypass_rm_confirmation || 'N/A'}</span></div>
+            <div class="detail-row"><span class="label">Reason</span><span class="value" style="font-size:0.8rem;">${payInfo.payment_bypass_reason || 'N/A'}</span></div>
+          </div>
+        `;
+      }
 
       pCard.innerHTML = `
         <h3>Payment (PayU) <span class="status-badge status-${capStatus}" style="float:right">${capStatus}</span></h3>
@@ -107,7 +129,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         <div class="detail-row"><span class="label">Txn ID</span><span class="value">${payInfo.txnid || 'N/A'}</span></div>
         <div class="detail-row"><span class="label">Method</span><span class="value">${(payInfo.payment_method || 'N/A').toUpperCase()}</span></div>
         ${skipAuditHtml}
+        ${bypassAuditHtml}
         ${skipBtnHtml}
+        ${bypassBtnHtml}
       `;
       // Prepend the payment card so it shows first
       grid.insertBefore(pCard, grid.firstChild);
@@ -159,10 +183,74 @@ document.addEventListener('DOMContentLoaded', async () => {
               confirmBtn.textContent = 'Confirm Skip';
               confirmBtn.disabled = false;
             }
-          } catch(e) {
+          } catch (err) {
+            console.error(err);
             alert('Server error while skipping payment.');
             confirmBtn.textContent = 'Confirm Skip';
             confirmBtn.disabled = false;
+          }
+        });
+      }
+      
+      // Bind bypass logic
+      const bypassTrigger = document.getElementById('bypass-payment-trigger');
+      if (bypassTrigger) {
+        const bypassModal = document.getElementById('bypass-modal');
+        const bypassReason = document.getElementById('bypass-reason');
+        const bypassRmRef = document.getElementById('bypass-rm-ref');
+        const confirmBypassBtn = document.getElementById('confirm-bypass-btn');
+        const cancelBypassBtn = document.getElementById('cancel-bypass-btn');
+        
+        document.getElementById('bypass-txnid').textContent = payInfo.txnid || 'N/A';
+        document.getElementById('bypass-amount').textContent = payInfo.amount || '0';
+        
+        bypassTrigger.addEventListener('click', () => {
+          bypassModal.style.display = 'flex';
+        });
+        
+        cancelBypassBtn.addEventListener('click', () => {
+          bypassModal.style.display = 'none';
+          bypassReason.value = '';
+          bypassRmRef.value = '';
+        });
+        
+        confirmBypassBtn.addEventListener('click', async () => {
+          const reason = bypassReason.value.trim();
+          const rmRef = bypassRmRef.value.trim();
+          
+          if (!reason || !rmRef) {
+            alert('Please provide both the RM Confirmation Reference and a Reason for bypass.');
+            return;
+          }
+          
+          confirmBypassBtn.textContent = 'Processing...';
+          confirmBypassBtn.disabled = true;
+          
+          try {
+            const token = localStorage.getItem('kyc_token');
+            const res = await fetch(`/api/kyc-dashboard/clients/${clientCode}/allow-bypass`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+              },
+              body: JSON.stringify({ reason: reason, rmConfirmation: rmRef })
+            });
+            const result = await res.json();
+            
+            if (result.success) {
+              alert('Payment bypass approved successfully.');
+              window.location.reload();
+            } else {
+              alert(result.message || 'Failed to approve payment bypass.');
+              confirmBypassBtn.textContent = 'Confirm and Allow Bypass';
+              confirmBypassBtn.disabled = false;
+            }
+          } catch (err) {
+            console.error(err);
+            alert('Server error while approving payment bypass.');
+            confirmBypassBtn.textContent = 'Confirm and Allow Bypass';
+            confirmBypassBtn.disabled = false;
           }
         });
       }

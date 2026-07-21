@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard - KYC Operations</title>
+  <link rel="stylesheet" href="styles.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="layout">
+    <div id="sidebar-container"></div>
+    <main class="main-content">
+      <header class="top-header">
+        <h1>Dashboard Summary</h1>
+        <div class="user-profile">KYC Admin</div>
+      </header>
+      
+      <div class="dashboard-content">
+        <p class="subtitle">Overview of external integration push statuses</p>
+        
+        <div id="metrics-container" class="metrics-grid">
+          <!-- Metric cards will be injected here -->
+          <div class="loading">Loading metrics...</div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="api.js"></script>
+  <script src="sidebar.js"></script>
+  <script src="dashboard.js"></script>
+</body>
+</html>

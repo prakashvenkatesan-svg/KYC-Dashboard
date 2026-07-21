@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Clients - KYC Operations</title>
+  <link rel="stylesheet" href="styles.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="layout">
+    <div id="sidebar-container"></div>
+    <main class="main-content">
+      <header class="top-header">
+        <h1 id="page-title">Client Listing</h1>
+        <div class="user-profile">KYC Admin</div>
+      </header>
+      
+      <div class="table-container">
+        <div class="controls">
+          <input type="text" id="search-input" placeholder="Search by Client Code, PAN, Email..." style="flex:1;">
+          
+          <select id="integration-filter">
+            <option value="">All Integrations</option>
+            <option value="nse">NSE</option>
+            <option value="bse">BSE</option>
+            <option value="cvlkra">CVL KRA</option>
+            <option value="cdsl">CDSL</option>
+            <option value="techexcel">TechExcel</option>
+          </select>
+
+          <select id="status-filter">
+            <option value="">All Statuses</option>
+            <option value="Success">Success</option>
+            <option value="Pending">Pending</option>
+            <option value="Rejected">Rejected/Failed</option>
+          </select>
+          
+          <button id="search-btn" class="pagination" style="border: none; background: var(--primary-color); color: white; border-radius: 6px; padding: 0 16px; cursor: pointer;">Search</button>
+        </div>
+        
+        <div style="overflow-x: auto;">
+          <table>
+            <thead>
+              <tr>
+                <th>Client Code</th>
+                <th>Name & Contact</th>
+                <th>NSE</th>
+                <th>BSE</th>
+                <th>CVL KRA</th>
+                <th>CDSL</th>
+                <th>TechExcel</th>
+                <th>Last Updated</th>
+              </tr>
+            </thead>
+            <tbody id="clients-tbody">
+              <tr>
+                <td colspan="8" style="text-align: center;">Loading...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        
+        <div class="pagination">
+          <span id="page-info">Showing 0 of 0</span>
+          <div style="display: flex; gap: 8px;">
+            <button id="prev-btn" disabled>Previous</button>
+            <button id="next-btn" disabled>Next</button>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="api.js"></script>
+  <script src="sidebar.js"></script>
+  <script src="clients.js"></script>
+</body>
+</html>

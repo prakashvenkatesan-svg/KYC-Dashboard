@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Client Details - KYC Operations</title>
+  <link rel="stylesheet" href="styles.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="layout">
+    <div id="sidebar-container"></div>
+    <main class="main-content">
+      <header class="top-header" style="margin-bottom: 20px;">
+        <div>
+          <a href="clients.html" class="back-link">← Back to Clients</a>
+          <h1 id="client-name">Loading...</h1>
+          <p class="subtitle" id="client-code-pan"></p>
+        </div>
+        <div class="user-profile">KYC Admin</div>
+      </header>
+      
+      <div id="integrations-grid" class="detail-grid">
+        <div class="loading">Loading details...</div>
+      </div>
+    </main>
+  </div>
+
+  <script src="api.js"></script>
+  <script src="sidebar.js"></script>
+  <script src="client-detail.js"></script>
+</body>
+</html>

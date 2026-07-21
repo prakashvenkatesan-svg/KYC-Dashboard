@@ -8,7 +8,7 @@ document.addEventListener('DOMContentLoaded', () => {
   
   if (initialIntegration) {
     document.getElementById('integration-filter').value = initialIntegration.toLowerCase();
-    document.getElementById('page-title').textContent = \`\${initialIntegration.toUpperCase()} - Client Listing\`;
+    document.getElementById('page-title').textContent = `${initialIntegration.toUpperCase()} - Client Listing`;
   }
   
   document.getElementById('search-btn').addEventListener('click', () => {
@@ -43,11 +43,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
 const renderStatusBadge = (status, reason) => {
   const normStatus = status ? status : 'Pending';
-  const badgeClass = \`status-\${normStatus}\`;
+  const badgeClass = `status-${normStatus}`;
   
-  let html = \`<span class="status-badge \${badgeClass}">\${normStatus}</span>\`;
+  let html = `<span class="status-badge ${badgeClass}">${normStatus}</span>`;
   if (reason && ['Rejected', 'Failed'].includes(normStatus)) {
-    html += \`<span class="rejection-reason" title="\${reason}">\${reason}</span>\`;
+    html += `<span class="rejection-reason" title="${reason}">${reason}</span>`;
   }
   return html;
 };
@@ -81,7 +81,7 @@ const loadClients = async () => {
     const clients = response.data;
     totalRecords = response.pagination.total;
     
-    document.getElementById('page-info').textContent = \`Showing \${Math.min(offset + 1, totalRecords)} - \${Math.min(offset + limit, totalRecords)} of \${totalRecords}\`;
+    document.getElementById('page-info').textContent = `Showing ${Math.min(offset + 1, totalRecords)} - ${Math.min(offset + limit, totalRecords)} of ${totalRecords}`;
     
     document.getElementById('prev-btn').disabled = currentPage === 1;
     document.getElementById('next-btn').disabled = currentPage * limit >= totalRecords;

@@ -41,16 +41,46 @@ document.addEventListener('DOMContentLoaded', () => {
   loadClients();
 });
 
-const renderStatusBadge = (status, reason) => {
+const renderStatusBadge = (status, reason, integrationName, clientObj) => {
   const normStatus = status ? status : 'Pending';
   const badgeClass = `status-${normStatus}`;
   
-  let html = `<span class="status-badge ${badgeClass}">${normStatus}</span>`;
+  // Escape JSON string for HTML attribute
+  const clientData = encodeURIComponent(JSON.stringify(clientObj));
+  
+  let html = `<span class="status-badge ${badgeClass}" onclick="openStatusModal(event, '${integrationName}', '${normStatus}', '${reason || ''}', '${clientData}')">${normStatus}</span>`;
   if (reason && ['Rejected', 'Failed'].includes(normStatus)) {
     html += `<span class="rejection-reason" title="${reason}">${reason}</span>`;
   }
   return html;
 };
+
+window.openStatusModal = (event, integrationName, status, reason, clientDataStr) => {
+  event.stopPropagation(); // prevent row click
+  const clientObj = JSON.parse(decodeURIComponent(clientDataStr));
+  
+  document.getElementById('modal-integration-title').textContent = `${integrationName.toUpperCase()} Status Details`;
+  
+  const lastUpdated = clientObj.last_updated ? new Date(clientObj.last_updated).toLocaleString() : 'N/A';
+  
+  document.getElementById('modal-status-body').innerHTML = `
+    <p><strong>Client Code:</strong> ${clientObj.client_code || 'N/A'}</p>
+    <p><strong>Client Name:</strong> ${clientObj.client_name || 'N/A'}</p>
+    <p><strong>Integration:</strong> ${integrationName.toUpperCase()}</p>
+    <p><strong>Current Status:</strong> <span class="status-badge status-${status}">${status}</span></p>
+    ${reason ? `<p><strong>Rejection Reason / Remarks:</strong> <span style="color: #dc3545;">${reason}</span></p>` : ''}
+    <p><strong>Last Updated:</strong> ${lastUpdated}</p>
+  `;
+  
+  document.getElementById('status-modal').style.display = 'flex';
+};
+
+document.addEventListener('DOMContentLoaded', () => {
+  const closeBtns = document.querySelectorAll('.close-status-modal');
+  closeBtns.forEach(btn => btn.addEventListener('click', () => {
+    document.getElementById('status-modal').style.display = 'none';
+  }));
+});
 
 const loadClients = async () => {
   const tbody = document.getElementById('clients-tbody');
@@ -102,14 +132,10 @@ const loadClients = async () => {
       offset
     };
     
-    if (integrationFilter && statusFilter) {
-      params.integration = integrationFilter;
-      params.status = statusFilter;
+    if (integrationFilter || statusFilter) {
+      if (integrationFilter) params.integration = integrationFilter;
+      if (statusFilter) params.status = statusFilter;
     }
-    
-    // Actually, backend supports filtering even if only integration or only status is present? 
-    // Wait, backend explicitly checks if (integration && status) in the controller.
-    // If they select an integration but not a status, we could pass it anyway if the backend was updated, but we wrote: if (integration && status)
     
     const response = await window.api.getClients(params);
     const clients = response.data;
@@ -142,15 +168,15 @@ const loadClients = async () => {
         <td>${client.pan_number || 'N/A'}</td>
         <td>${client.email || 'N/A'}</td>
         <td>${client.mobile_number || 'N/A'}</td>
-        ${showNse ? `<td>${renderStatusBadge(client.nse_push_status, client.nse_rejection_reason)}</td>` : ''}
+        ${showNse ? `<td>${renderStatusBadge(client.nse_push_status, client.nse_rejection_reason, 'NSE', client)}</td>` : ''}
         ${integrationFilter === 'nse' ? `<td style="color: #dc3545; font-size: 0.85em;">${client.nse_rejection_reason || '-'}</td>` : ''}
-        ${showBse ? `<td>${renderStatusBadge(client.bse_push_status, client.bse_rejection_reason)}</td>` : ''}
+        ${showBse ? `<td>${renderStatusBadge(client.bse_push_status, client.bse_rejection_reason, 'BSE', client)}</td>` : ''}
         ${integrationFilter === 'bse' ? `<td style="color: #dc3545; font-size: 0.85em;">${client.bse_rejection_reason || '-'}</td>` : ''}
-        ${showCvlkra ? `<td>${renderStatusBadge(client.cvlkra_sync_status, client.cvlkra_rejection_reason)}</td>` : ''}
+        ${showCvlkra ? `<td>${renderStatusBadge(client.cvlkra_sync_status, client.cvlkra_rejection_reason, 'CVL KRA', client)}</td>` : ''}
         ${integrationFilter === 'cvlkra' ? `<td style="color: #dc3545; font-size: 0.85em;">${client.cvlkra_rejection_reason || '-'}</td>` : ''}
-        ${showCdsl ? `<td>${renderStatusBadge(client.cdsl_push_status, client.cdsl_rejection_reason)}</td>` : ''}
+        ${showCdsl ? `<td>${renderStatusBadge(client.cdsl_push_status, client.cdsl_rejection_reason, 'CDSL', client)}</td>` : ''}
         ${integrationFilter === 'cdsl' ? `<td style="color: #dc3545; font-size: 0.85em;">${client.cdsl_rejection_reason || '-'}</td>` : ''}
-        ${showTechexcel ? `<td>${renderStatusBadge(client.techexcel_push_status, client.techexcel_rejection_reason)}</td>` : ''}
+        ${showTechexcel ? `<td>${renderStatusBadge(client.techexcel_push_status, client.techexcel_rejection_reason, 'TechExcel', client)}</td>` : ''}
         ${integrationFilter === 'techexcel' ? `<td style="color: #dc3545; font-size: 0.85em;">${client.techexcel_rejection_reason || '-'}</td>` : ''}
       `;
       

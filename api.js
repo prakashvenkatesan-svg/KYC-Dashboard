@@ -1,14 +1,62 @@
 const API_BASE_URL = 'https://xvbefkfln5.execute-api.ap-south-1.amazonaws.com/admin/kyc-dashboard';
 
-// We assume there's a global token or cookie for auth since it's an admin panel.
-// We'll simulate sending an authorization header if a token is in localStorage.
+// We use the local storage key defined in our new auth flow
 const getAuthHeaders = () => {
-  const token = localStorage.getItem('adminToken');
+  const token = localStorage.getItem('kyc_auth_token');
   return {
     'Content-Type': 'application/json',
     ...(token ? { 'Authorization': `Bearer ${token}` } : {})
   };
 };
+
+// Global Auth Check & Logout setup
+const initAuth = () => {
+  const token = localStorage.getItem('kyc_auth_token');
+  const userStr = localStorage.getItem('kyc_user');
+  
+  if (!token || !userStr) {
+    if (window.location.pathname.includes('login.html')) return;
+    
+    // Quick prompt for login if not on login page
+    const username = prompt("Username:");
+    if (!username) return;
+    const password = prompt("Password:");
+    
+    fetch(`${API_BASE_URL}/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password })
+    })
+    .then(r => r.json())
+    .then(data => {
+      if (data.success) {
+        localStorage.setItem('kyc_auth_token', data.token);
+        localStorage.setItem('kyc_user', JSON.stringify(data.user));
+        location.reload();
+      } else {
+        alert('Login failed: ' + data.message);
+      }
+    });
+  } else {
+    // Populate user UI if elements exist
+    const user = JSON.parse(userStr);
+    const loggedInEl = document.getElementById('logged-in-user');
+    if (loggedInEl) {
+      loggedInEl.textContent = `${user.full_name} (${user.role})`;
+    }
+    
+    const logoutBtn = document.getElementById('logout-btn');
+    if (logoutBtn) {
+      logoutBtn.addEventListener('click', () => {
+        localStorage.removeItem('kyc_auth_token');
+        localStorage.removeItem('kyc_user');
+        location.reload();
+      });
+    }
+  }
+};
+
+document.addEventListener('DOMContentLoaded', initAuth);
 
 const api = {
   getDashboardSummary: async () => {
@@ -30,7 +78,36 @@ const api = {
   getIntegrationRecords: async (integrationName, params = {}) => {
     const qs = new URLSearchParams(params).toString();
     const res = await fetch(`${API_BASE_URL}/integrations/${integrationName}?${qs}`, { headers: getAuthHeaders() });
-    if (!res.ok) throw new Error('Failed to fetch integration records');
+    if (!res.ok && res.status !== 401 && res.status !== 403) throw new Error('Failed to fetch integration records');
+    return res.json();
+  },
+  
+  // Generic methods for User Management (and others)
+  get: async (path) => {
+    const res = await fetch(`${API_BASE_URL}${path}`, { headers: getAuthHeaders() });
+    return res.json();
+  },
+  post: async (path, data) => {
+    const res = await fetch(`${API_BASE_URL}${path}`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(data)
+    });
+    return res.json();
+  },
+  put: async (path, data) => {
+    const res = await fetch(`${API_BASE_URL}${path}`, {
+      method: 'PUT',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(data)
+    });
+    return res.json();
+  },
+  delete: async (path) => {
+    const res = await fetch(`${API_BASE_URL}${path}`, {
+      method: 'DELETE',
+      headers: getAuthHeaders()
+    });
     return res.json();
   }
 };

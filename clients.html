@@ -13,14 +13,17 @@
     <main class="main-content">
       <header class="top-header">
         <h1 id="page-title">Client Listing</h1>
-        <div class="user-profile">KYC Admin</div>
+        <div class="user-profile" style="display:flex; align-items:center; gap: 10px;">
+          <span id="logged-in-user">Loading...</span>
+          <button id="logout-btn" style="background:transparent; border:1px solid var(--border-color); color:var(--text-color); cursor:pointer; padding: 4px 8px; border-radius:4px;">Logout</button>
+        </div>
       </header>
       
       <div class="table-container">
-        <div class="controls">
-          <input type="text" id="search-input" placeholder="Search by Client Code, PAN, Email..." style="flex:1;">
+        <div class="controls" style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 20px;">
+          <input type="text" id="search-input" placeholder="Search Code, PAN, Email..." style="flex: 0 1 250px; padding: 8px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-color);">
           
-          <select id="integration-filter">
+          <select id="integration-filter" style="padding: 8px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-color);">
             <option value="">All Integrations</option>
             <option value="nse">NSE</option>
             <option value="bse">BSE</option>
@@ -29,18 +32,19 @@
             <option value="techexcel">TechExcel</option>
           </select>
 
-          <select id="status-filter">
+          <select id="status-filter" style="padding: 8px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-color);">
             <option value="">All Statuses</option>
             <option value="Success">Success</option>
             <option value="Pending">Pending</option>
             <option value="Rejected">Rejected/Failed</option>
+            <option value="Uploaded">Uploaded</option>
           </select>
           
-          <button id="search-btn" class="pagination" style="border: none; background: var(--primary-color); color: white; border-radius: 6px; padding: 0 16px; cursor: pointer;">Search</button>
+          <button id="search-btn" style="border: none; background: var(--primary-color); color: white; border-radius: 6px; padding: 8px 16px; cursor: pointer; font-weight: 500;">Search</button>
         </div>
         
-        <div style="overflow-x: auto;">
-          <table>
+        <div class="table-wrapper" style="overflow-x: auto; max-width: 100%; border: 1px solid var(--border-color); border-radius: 8px;">
+          <table style="width: 100%; border-collapse: collapse; min-width: 1200px;">
             <thead>
               <tr>
             <th>APPLICATION DATE</th>
@@ -69,15 +73,31 @@
           </table>
         </div>
         
-        <div class="pagination">
+        <div class="pagination" style="display: flex; justify-content: space-between; align-items: center; margin-top: 20px;">
           <span id="page-info">Showing 0 of 0</span>
           <div style="display: flex; gap: 8px;">
-            <button id="prev-btn" disabled>Previous</button>
-            <button id="next-btn" disabled>Next</button>
+            <button id="prev-btn" style="padding: 6px 12px; cursor: pointer; background: var(--surface-color); border: 1px solid var(--border-color); color: var(--text-color); border-radius: 4px;" disabled>Previous</button>
+            <button id="next-btn" style="padding: 6px 12px; cursor: pointer; background: var(--surface-color); border: 1px solid var(--border-color); color: var(--text-color); border-radius: 4px;" disabled>Next</button>
           </div>
         </div>
       </div>
     </main>
+  </div>
+
+  <!-- Status Detail Modal -->
+  <div id="status-modal" class="modal" style="display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); align-items: center; justify-content: center;">
+    <div class="modal-content" style="background-color: var(--surface-color); border-radius: 8px; width: 500px; max-width: 90%; padding: 24px; box-shadow: 0 4px 12px rgba(0,0,0,0.2);">
+      <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px solid var(--border-color); padding-bottom: 10px;">
+        <h2 id="modal-integration-title" style="margin: 0; font-size: 1.2rem;">Integration Details</h2>
+        <button class="close-status-modal" style="cursor: pointer; font-size: 1.5rem; color: var(--text-muted); border: none; background: transparent;">&times;</button>
+      </div>
+      <div id="modal-status-body" style="line-height: 1.6; font-size: 0.95rem;">
+        <!-- Dynamic content goes here -->
+      </div>
+      <div class="modal-actions" style="display: flex; justify-content: flex-end; margin-top: 20px;">
+        <button class="close-status-modal" style="background: var(--primary-color); border: none; color: white; padding: 8px 16px; border-radius: 4px; cursor: pointer;">Close</button>
+      </div>
+    </div>
   </div>
 
   <script src="api.js"></script>

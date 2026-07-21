@@ -21,7 +21,7 @@
       
       <div class="table-container">
         <div class="controls" style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 20px;">
-          <input type="text" id="search-input" placeholder="Search Code, PAN, Email..." style="flex: 0 1 250px; padding: 8px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-color);">
+          <input type="text" id="search-input" placeholder="Search Code, PAN, Email..." style="flex: 0 1 200px; padding: 8px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-color);">
           
           <select id="integration-filter" style="padding: 8px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-color);">
             <option value="">All Integrations</option>
@@ -40,7 +40,13 @@
             <option value="Uploaded">Uploaded</option>
           </select>
           
-          <button id="search-btn" style="border: none; background: var(--primary-color); color: white; border-radius: 6px; padding: 8px 16px; cursor: pointer; font-weight: 500;">Search</button>
+          <input type="date" id="from-date" style="padding: 8px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-color);" title="From Date">
+          <input type="date" id="to-date" style="padding: 8px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-color);" title="To Date">
+          
+          <div style="display: flex; gap: 8px;">
+            <button id="search-btn" style="border: none; background: var(--primary-color); color: white; border-radius: 6px; padding: 8px 16px; cursor: pointer; font-weight: 500;">Search / Apply</button>
+            <button id="reset-btn" style="border: 1px solid var(--border-color); background: transparent; color: var(--text-primary); border-radius: 6px; padding: 8px 16px; cursor: pointer; font-weight: 500;">Reset</button>
+          </div>
         </div>
         
         <div class="table-wrapper" style="overflow-x: auto; max-width: 100%; border: 1px solid var(--border-color); border-radius: 8px;">

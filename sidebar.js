@@ -1,8 +1,11 @@
 const sidebarHTML = `
   <aside class="sidebar">
-    <div class="sidebar-brand">
-      <h2>AIONION Capital</h2>
-      <p>KYC Operations</p>
+    <div class="sidebar-brand" style="display: flex; align-items: center; gap: 12px; cursor: pointer; padding-top: 16px;" onclick="window.location.href='dashboard.html'">
+      <img src="logo.png" alt="Logo" style="width: 44px; height: 44px; object-fit: contain;">
+      <div>
+        <h2 style="margin-bottom: 2px;">AIONION Capital</h2>
+        <p style="margin: 0;">KYC Operations</p>
+      </div>
     </div>
     <nav class="sidebar-nav">
       <a href="dashboard.html" class="nav-link" id="nav-dashboard">

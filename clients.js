@@ -23,6 +23,16 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
   
+  document.getElementById('reset-btn').addEventListener('click', () => {
+    document.getElementById('search-input').value = '';
+    document.getElementById('integration-filter').value = '';
+    document.getElementById('status-filter').value = '';
+    document.getElementById('from-date').value = '';
+    document.getElementById('to-date').value = '';
+    currentPage = 1;
+    loadClients();
+  });
+  
   document.getElementById('next-btn').addEventListener('click', () => {
     if (currentPage * limit < totalRecords) {
       currentPage++;
@@ -87,6 +97,13 @@ const loadClients = async () => {
   const searchInput = document.getElementById('search-input').value;
   const integrationFilter = document.getElementById('integration-filter').value;
   const statusFilter = document.getElementById('status-filter').value;
+  const fromDate = document.getElementById('from-date').value;
+  const toDate = document.getElementById('to-date').value;
+  
+  if (fromDate && toDate && new Date(toDate) < new Date(fromDate)) {
+    alert("To Date cannot be earlier than From Date.");
+    return;
+  }
   
   // Toggle header visibility
   const showNse = !integrationFilter || integrationFilter === 'nse';
@@ -132,9 +149,11 @@ const loadClients = async () => {
       offset
     };
     
-    if (integrationFilter || statusFilter) {
+    if (integrationFilter || statusFilter || fromDate || toDate) {
       if (integrationFilter) params.integration = integrationFilter;
       if (statusFilter) params.status = statusFilter;
+      if (fromDate) params.fromDate = fromDate;
+      if (toDate) params.toDate = toDate;
     }
     
     const response = await window.api.getClients(params);
@@ -149,7 +168,8 @@ const loadClients = async () => {
     tbody.innerHTML = '';
     
     if (clients.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="${colCount}" style="text-align: center;">No clients found</td></tr>`;
+      const msg = (fromDate || toDate) ? "No records found for the selected date range" : "No clients found";
+      tbody.innerHTML = `<tr><td colspan="${colCount}" style="text-align: center;">${msg}</td></tr>`;
       return;
     }
     

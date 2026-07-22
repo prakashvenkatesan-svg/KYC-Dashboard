@@ -56,16 +56,26 @@ document.addEventListener('DOMContentLoaded', () => {
   });
   
   document.getElementById('reset-btn').addEventListener('click', () => {
-    document.getElementById('search-input').value = '';
+    const searchInput = document.getElementById('search-input');
+    if (searchInput) searchInput.value = '';
     
     if (!initialIntegration) {
-      document.getElementById('integration-filter').value = '';
+      const intFilter = document.getElementById('integration-filter');
+      if (intFilter) intFilter.value = '';
     }
     
-    document.getElementById('status-filter').value = '';
-    document.getElementById('current-stage-filter').value = '';
-    document.getElementById('from-date').value = '';
-    document.getElementById('to-date').value = '';
+    const statusFilter = document.getElementById('status-filter');
+    if (statusFilter) statusFilter.value = '';
+    
+    const stageFilter = document.getElementById('current-stage-filter');
+    if (stageFilter) stageFilter.value = '';
+    
+    const fromDate = document.getElementById('from-date');
+    if (fromDate) fromDate.value = '';
+    
+    const toDate = document.getElementById('to-date');
+    if (toDate) toDate.value = '';
+    
     currentPage = 1;
     loadClients();
   });
@@ -131,12 +141,23 @@ document.addEventListener('DOMContentLoaded', () => {
 
 const loadClients = async () => {
   const tbody = document.getElementById('clients-tbody');
-  const searchInput = document.getElementById('search-input').value;
-  const integrationFilter = document.getElementById('integration-filter').value;
-  const statusFilter = document.getElementById('status-filter').value;
-  const currentStageFilter = document.getElementById('current-stage-filter').value;
-  const fromDate = document.getElementById('from-date').value;
-  const toDate = document.getElementById('to-date').value;
+  const searchInputEl = document.getElementById('search-input');
+  const searchInput = searchInputEl ? searchInputEl.value : '';
+
+  const integrationFilterEl = document.getElementById('integration-filter');
+  const integrationFilter = integrationFilterEl ? integrationFilterEl.value : '';
+
+  const statusFilterEl = document.getElementById('status-filter');
+  const statusFilter = statusFilterEl ? statusFilterEl.value : '';
+
+  const currentStageFilterEl = document.getElementById('current-stage-filter');
+  const currentStageFilter = currentStageFilterEl ? currentStageFilterEl.value : '';
+
+  const fromDateEl = document.getElementById('from-date');
+  const fromDate = fromDateEl ? fromDateEl.value : '';
+
+  const toDateEl = document.getElementById('to-date');
+  const toDate = toDateEl ? toDateEl.value : '';
   
   if (fromDate && toDate && new Date(toDate) < new Date(fromDate)) {
     alert("To Date cannot be earlier than From Date.");

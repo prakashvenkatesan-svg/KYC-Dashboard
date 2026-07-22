@@ -43,18 +43,36 @@
           <input type="date" id="from-date" style="padding: 8px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-color);" title="From Date">
           <input type="date" id="to-date" style="padding: 8px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-color);" title="To Date">
           
-          <div style="display: flex; gap: 8px;">
+          <div style="display: flex; gap: 8px; align-items: center; position: relative;">
             <button id="search-btn" style="border: none; background: var(--primary-color); color: white; border-radius: 6px; padding: 8px 16px; cursor: pointer; font-weight: 500;">Search / Apply</button>
             <button id="reset-btn" style="border: 1px solid var(--border-color); background: transparent; color: var(--text-primary); border-radius: 6px; padding: 8px 16px; cursor: pointer; font-weight: 500;">Reset</button>
+            <button id="customize-cols-btn" style="border: 1px solid var(--border-color); background: var(--surface-color); color: var(--text-primary); border-radius: 6px; padding: 8px 16px; cursor: pointer; font-weight: 500; display: flex; align-items: center; gap: 6px;">Columns ⚙</button>
+            
+            <!-- Customize Columns Dropdown -->
+            <div id="customize-cols-panel" style="display: none; position: absolute; top: 100%; right: 0; margin-top: 8px; background: var(--surface-color); border: 1px solid var(--border-color); border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.2); width: 280px; z-index: 100; padding: 16px; display: flex; flex-direction: column; gap: 12px;">
+              <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 8px;">
+                <h3 style="margin: 0; font-size: 1rem;">Customize Columns</h3>
+                <button id="close-customize-btn" style="background: transparent; border: none; font-size: 1.2rem; cursor: pointer; color: var(--text-muted);">&times;</button>
+              </div>
+              
+              <div id="columns-list" style="display: flex; flex-direction: column; gap: 8px; max-height: 300px; overflow-y: auto; padding-right: 4px;">
+                <!-- Dynamically populated via JS -->
+              </div>
+              
+              <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--border-color); padding-top: 12px; margin-top: 4px;">
+                <button id="reset-cols-btn" style="background: transparent; border: 1px solid var(--border-color); color: var(--text-primary); padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 0.85rem;">Reset Columns</button>
+                <button id="save-cols-btn" style="background: var(--primary-color); border: none; color: white; padding: 6px 16px; border-radius: 4px; cursor: pointer; font-size: 0.85rem;">Apply</button>
+              </div>
+            </div>
           </div>
         </div>
         
         <div class="table-wrapper" style="overflow-x: auto; max-width: 100%; border: 1px solid var(--border-color); border-radius: 8px;">
           <table style="width: 100%; border-collapse: collapse; min-width: 1200px;">
             <thead>
-              <tr>
-            <th>APPLICATION DATE</th>
-            <th>CLIENT CODE</th>
+              <tr id="table-header-row">
+            <th data-col="application_date" style="cursor: pointer; user-select: none;" id="th-application_date">APPLICATION DATE <span id="sort-icon" style="font-size:12px; margin-left:4px;">&darr;</span></th>
+            <th data-col="client_code">CLIENT CODE</th>
             <th>CLIENT NAME</th>
             <th>PAN NUMBER</th>
             <th>EMAIL ID</th>

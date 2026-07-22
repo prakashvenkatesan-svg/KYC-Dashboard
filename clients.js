@@ -58,12 +58,13 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('reset-btn').addEventListener('click', () => {
     document.getElementById('search-input').value = '';
     
-    const filterDropdown = document.getElementById('integration-filter');
-    if (!filterDropdown.disabled) {
-      filterDropdown.value = '';
+    if (!initialIntegration) {
+      document.getElementById('integration-filter').value = '';
     }
     
     document.getElementById('status-filter').value = '';
+    document.getElementById('overall-status-filter').value = '';
+    document.getElementById('current-stage-filter').value = '';
     document.getElementById('from-date').value = '';
     document.getElementById('to-date').value = '';
     currentPage = 1;
@@ -134,6 +135,8 @@ const loadClients = async () => {
   const searchInput = document.getElementById('search-input').value;
   const integrationFilter = document.getElementById('integration-filter').value;
   const statusFilter = document.getElementById('status-filter').value;
+  const overallStatusFilter = document.getElementById('overall-status-filter').value;
+  const currentStageFilter = document.getElementById('current-stage-filter').value;
   const fromDate = document.getElementById('from-date').value;
   const toDate = document.getElementById('to-date').value;
   
@@ -221,6 +224,13 @@ const loadClients = async () => {
       };
       
       const appDate = client.application_date ? new Date(client.application_date).toLocaleDateString('en-GB') : 'N/A';
+      const lastActivity = client.last_activity_date ? new Date(client.last_activity_date).toLocaleString('en-GB') : 'N/A';
+      
+      let overallStatusBadge = '';
+      if (client.overall_status === 'completed') overallStatusBadge = '<span class="status-badge" style="background:#10B981">Completed</span>';
+      else if (client.overall_status === 'failed') overallStatusBadge = '<span class="status-badge" style="background:#dc3545">Failed</span>';
+      else if (client.overall_status === 'in_progress') overallStatusBadge = '<span class="status-badge" style="background:#f59e0b">In Progress</span>';
+      else overallStatusBadge = '<span class="status-badge" style="background:#6c757d">Not Started</span>';
       
       tr.innerHTML = `
         <td>${appDate}</td>
@@ -229,6 +239,15 @@ const loadClients = async () => {
         <td>${client.pan_number || 'N/A'}</td>
         <td>${client.email || 'N/A'}</td>
         <td>${client.mobile_number || 'N/A'}</td>
+        <td>${client.current_stage || 'Not Started'}</td>
+        <td>${overallStatusBadge}</td>
+        <td>
+          <div style="width:100%; background:#e2e8f0; border-radius:10px; height:8px; overflow:hidden; margin-bottom:4px;">
+            <div style="height:100%; background:var(--primary-color); width:${client.progress_percentage}%;"></div>
+          </div>
+          <span style="font-size:0.8rem; color:var(--text-secondary);">${client.progress_percentage}%</span>
+        </td>
+        <td style="font-size:0.85rem; color:var(--text-secondary);">${lastActivity}</td>
         ${showNse ? `<td>${renderStatusBadge(client.nse_push_status, client.nse_rejection_reason, 'NSE', client)}</td>` : ''}
         ${integrationFilter === 'nse' ? `<td style="color: #dc3545; font-size: 0.85em;">${client.nse_rejection_reason || '-'}</td>` : ''}
         ${showBse ? `<td>${renderStatusBadge(client.bse_push_status, client.bse_rejection_reason, 'BSE', client)}</td>` : ''}

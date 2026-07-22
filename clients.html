@@ -40,6 +40,30 @@
             <option value="Uploaded">Uploaded</option>
           </select>
           
+          <select id="overall-status-filter" style="padding: 8px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-color);">
+            <option value="">All Overall Statuses</option>
+            <option value="not_started">Not Started</option>
+            <option value="in_progress">In Progress</option>
+            <option value="completed">Completed</option>
+            <option value="failed">Failed</option>
+          </select>
+
+          <select id="current-stage-filter" style="padding: 8px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-color);">
+            <option value="">All Stages</option>
+            <option value="Mobile Verification">Mobile Verification</option>
+            <option value="Email Verification">Email Verification</option>
+            <option value="PAN and DOB Verification">PAN and DOB Verification</option>
+            <option value="Bank Details">Bank Details</option>
+            <option value="Personal Details">Personal Details</option>
+            <option value="Nominee Details">Nominee Details</option>
+            <option value="Live Photo">Live Photo</option>
+            <option value="Signature">Signature</option>
+            <option value="Scheme Selection">Scheme Selection</option>
+            <option value="Payment">Payment</option>
+            <option value="PDF Generation">PDF Generation</option>
+            <option value="eSign">eSign</option>
+          </select>
+          
           <input type="date" id="from-date" style="padding: 8px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-color);" title="From Date">
           <input type="date" id="to-date" style="padding: 8px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-color);" title="To Date">
           
@@ -59,6 +83,10 @@
             <th>PAN NUMBER</th>
             <th>EMAIL ID</th>
             <th>MOBILE NUMBER</th>
+            <th>CURRENT STAGE</th>
+            <th>OVERALL STATUS</th>
+            <th>PROGRESS</th>
+            <th>LAST ACTIVITY</th>
             <th class="col-nse">NSE</th>
             <th class="col-nse-reason" style="display:none;">NSE REJECTION REASON</th>
             <th class="col-bse">BSE</th>

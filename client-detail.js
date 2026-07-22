@@ -303,6 +303,84 @@ document.addEventListener('DOMContentLoaded', async () => {
       `;
     }
 
+    // Fetch and Render KYC Stepper
+    try {
+      const stepperContainer = document.getElementById('kyc-stepper');
+      const progressRes = await fetch(`${API_BASE_URL}/clients/${clientCode}/kyc-progress`, { headers: getAuthHeaders() });
+      
+      if (progressRes.ok) {
+        const progressData = await progressRes.json();
+        if (progressData.success) {
+          
+          let stepperHtml = `<div style="margin-bottom: 24px;">
+            <div style="font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 8px;">Overall Status: <strong style="color: var(--text-primary); text-transform: capitalize;">${progressData.overallStatus.replace('_', ' ')}</strong></div>
+            <div style="width:100%; background:#e2e8f0; border-radius:10px; height:8px; overflow:hidden; margin-bottom:4px;">
+              <div style="height:100%; background:var(--primary-color); width:${progressData.progressPercentage}%;"></div>
+            </div>
+            <div style="font-size: 0.8rem; color: var(--text-secondary); text-align: right;">${progressData.progressPercentage}% Complete</div>
+          </div>
+          <div style="position: absolute; left: 15px; top: 75px; bottom: 20px; width: 2px; background: var(--border-color); z-index: 0;"></div>
+          `;
+
+          progressData.stages.forEach((stage, idx) => {
+            const isCompleted = ['completed', 'success', 'skipped', 'bypass_approved'].includes(stage.status.toLowerCase());
+            const isFailed = ['failed', 'rejected'].includes(stage.status.toLowerCase());
+            const isInProgress = stage.status.toLowerCase() === 'in_progress';
+            
+            let iconColor = 'var(--text-secondary)';
+            let iconContent = idx + 1;
+            let bgColor = 'var(--bg-color)';
+            let statusBadge = `<span class="status-badge" style="background:#6c757d; font-size:0.7rem; padding: 2px 6px;">${stage.status}</span>`;
+
+            if (isCompleted) {
+              iconColor = '#10B981';
+              bgColor = '#ecfdf5';
+              iconContent = '✓';
+              statusBadge = `<span class="status-badge" style="background:#10B981; font-size:0.7rem; padding: 2px 6px;">${stage.status}</span>`;
+            } else if (isFailed) {
+              iconColor = '#dc3545';
+              bgColor = '#fef2f2';
+              iconContent = '✕';
+              statusBadge = `<span class="status-badge" style="background:#dc3545; font-size:0.7rem; padding: 2px 6px;">${stage.status}</span>`;
+            } else if (isInProgress) {
+              iconColor = '#f59e0b';
+              bgColor = '#fffbeb';
+              iconContent = '○';
+              statusBadge = `<span class="status-badge" style="background:#f59e0b; font-size:0.7rem; padding: 2px 6px;">${stage.status}</span>`;
+            }
+
+            const timestamp = stage.completedAt ? new Date(stage.completedAt).toLocaleString('en-GB') : (stage.lastUpdated ? new Date(stage.lastUpdated).toLocaleString('en-GB') : '');
+
+            stepperHtml += `
+              <div style="display: flex; gap: 16px; margin-bottom: 24px; position: relative; z-index: 1;">
+                <div style="flex: 0 0 32px; height: 32px; border-radius: 50%; background: ${bgColor}; border: 2px solid ${iconColor}; display: flex; align-items: center; justify-content: center; font-weight: bold; color: ${iconColor}; font-size: 0.9rem;">
+                  ${iconContent}
+                </div>
+                <div style="flex: 1; padding-top: 4px;">
+                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                    <strong style="color: var(--text-primary); font-size: 0.95rem;">${stage.stageName}</strong>
+                    ${statusBadge}
+                  </div>
+                  ${stage.source ? `<div style="font-size: 0.8rem; color: var(--primary-color); margin-bottom: 2px;">Source: ${stage.source}</div>` : ''}
+                  ${timestamp ? `<div style="font-size: 0.75rem; color: var(--text-secondary);">${timestamp}</div>` : ''}
+                  ${stage.errorMessage ? `<div style="font-size: 0.8rem; color: #dc3545; margin-top: 4px;">Error: ${stage.errorMessage}</div>` : ''}
+                </div>
+              </div>
+            `;
+          });
+          
+          stepperContainer.innerHTML = stepperHtml;
+        } else {
+          stepperContainer.innerHTML = `<div class="error-msg">Failed to load KYC journey.</div>`;
+        }
+      } else {
+        stepperContainer.innerHTML = `<div class="error-msg">Failed to load KYC journey.</div>`;
+      }
+    } catch (err) {
+      console.error("Failed to load KYC progress:", err);
+      document.getElementById('kyc-stepper').innerHTML = `<div class="error-msg">Server error.</div>`;
+    }
+
   } catch (error) {
     grid.innerHTML = '<div class="error-msg">Failed to load client details.</div>';
     console.error(error);

@@ -24,8 +24,17 @@
         </div>
       </header>
       
-      <div id="integrations-grid" class="detail-grid">
-        <div class="loading">Loading details...</div>
+      <div style="display:flex; gap: 24px; align-items: flex-start;">
+        <div id="kyc-stepper-container" style="flex: 0 0 350px; background: var(--surface-color); border: 1px solid var(--surface-border); border-radius: 12px; padding: 24px; max-height: calc(100vh - 120px); overflow-y: auto;">
+          <h2 style="font-size: 1.1rem; margin-bottom: 20px;">KYC Journey</h2>
+          <div id="kyc-stepper" style="position: relative;">
+            <div class="loading">Loading journey...</div>
+          </div>
+        </div>
+
+        <div id="integrations-grid" class="detail-grid" style="flex: 1;">
+          <div class="loading">Loading details...</div>
+        </div>
       </div>
     </main>
   </div>

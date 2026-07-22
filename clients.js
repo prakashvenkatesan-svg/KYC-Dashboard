@@ -251,7 +251,7 @@ const loadClients = async () => {
         <td>${client.pan_number || 'N/A'}</td>
         <td>${client.email || 'N/A'}</td>
         <td>${client.mobile_number || 'N/A'}</td>
-        <td>${client.current_stage || 'Not Started'}</td>
+        ${!initialIntegration ? `<td>${client.current_stage || 'Not Started'}</td>` : ''}
         ${showNse ? `<td>${renderStatusBadge(client.nse_push_status, client.nse_rejection_reason, 'NSE', client)}</td>` : ''}
         ${integrationFilter === 'nse' ? `<td style="color: #dc3545; font-size: 0.85em;">${client.nse_rejection_reason || '-'}</td>` : ''}
         ${showBse ? `<td>${renderStatusBadge(client.bse_push_status, client.bse_rejection_reason, 'BSE', client)}</td>` : ''}

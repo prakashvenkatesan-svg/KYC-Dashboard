@@ -288,9 +288,11 @@ document.addEventListener('DOMContentLoaded', async () => {
           `;
         }
       } else {
+        const errData = await pdfRes.json().catch(() => ({}));
+        const errMsg = errData.message || 'Signed KYC PDF is not available for this client.';
         pdfCard.innerHTML = `
           <h3>Signed KYC Document <span class="status-badge" style="background:#dc3545; float:right;">Unavailable</span></h3>
-          <p style="color:var(--text-secondary); margin-top:16px; font-size:0.9rem;">Signed KYC PDF is not available for this client.</p>
+          <p style="color:var(--text-secondary); margin-top:16px; font-size:0.9rem;">${errMsg}</p>
         `;
       }
     } catch (err) {

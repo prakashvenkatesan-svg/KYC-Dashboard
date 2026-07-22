@@ -202,17 +202,32 @@ const api = {
   getClients: async (params = {}) => {
     const qs = new URLSearchParams(params).toString();
     const res = await fetch(`${API_BASE_URL}/clients?${qs}`, { headers: getAuthHeaders() });
+    if (res.status === 401) {
+      localStorage.removeItem('kyc_auth_token');
+      window.location.href = 'login.html';
+      return;
+    }
     if (!res.ok) throw new Error('Failed to fetch clients');
     return res.json();
   },
   getClientByCode: async (clientCode) => {
     const res = await fetch(`${API_BASE_URL}/clients/${clientCode}`, { headers: getAuthHeaders() });
-    if (!res.ok) throw new Error('Failed to fetch client detail');
+    if (res.status === 401) {
+      localStorage.removeItem('kyc_auth_token');
+      window.location.href = 'login.html';
+      return;
+    }
+    if (!res.ok) throw new Error('Failed to fetch client details');
     return res.json();
   },
   getIntegrationRecords: async (integrationName, params = {}) => {
     const qs = new URLSearchParams(params).toString();
     const res = await fetch(`${API_BASE_URL}/integrations/${integrationName}?${qs}`, { headers: getAuthHeaders() });
+    if (res.status === 401) {
+      localStorage.removeItem('kyc_auth_token');
+      window.location.href = 'login.html';
+      return;
+    }
     if (!res.ok && res.status !== 401 && res.status !== 403) throw new Error('Failed to fetch integration records');
     return res.json();
   },

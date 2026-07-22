@@ -255,6 +255,51 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
       }
     }
+    
+    // Render Signed KYC Document section (Placeholder)
+    const pdfCard = document.createElement('div');
+    pdfCard.className = 'detail-card';
+    pdfCard.innerHTML = `
+      <h3>Signed KYC Document</h3>
+      <div style="display:flex; justify-content:center; align-items:center; height:100px;">
+        <span style="color:var(--text-secondary);">Loading PDF Status...</span>
+      </div>
+    `;
+    grid.appendChild(pdfCard);
+    
+    // Fetch PDF presigned URL
+    try {
+      const pdfRes = await fetch(`${API_BASE_URL}/clients/${clientCode}/signed-pdf`, { headers: getAuthHeaders() });
+      if (pdfRes.ok) {
+        const pdfData = await pdfRes.json();
+        if (pdfData.success && pdfData.signedPdfUrl) {
+          pdfCard.innerHTML = `
+            <h3>Signed KYC Document <span class="status-badge" style="background:#10B981; float:right;">Available</span></h3>
+            <div class="detail-row"><span class="label">File Name</span><span class="value">${pdfData.fileName}</span></div>
+            <div style="margin-top:20px; display:flex; gap:12px;">
+              <a href="${pdfData.signedPdfUrl}" target="_blank" style="flex:1; text-align:center; text-decoration:none; padding:8px 16px; border-radius:6px; background:#334155; color:white; font-size:0.9rem;">View PDF</a>
+              <a href="${pdfData.signedPdfUrl}" download="${pdfData.fileName}" style="flex:1; text-align:center; text-decoration:none; padding:8px 16px; border-radius:6px; background:var(--primary-color); color:white; font-size:0.9rem;">Download PDF</a>
+            </div>
+          `;
+        } else {
+          pdfCard.innerHTML = `
+            <h3>Signed KYC Document <span class="status-badge" style="background:#dc3545; float:right;">Unavailable</span></h3>
+            <p style="color:var(--text-secondary); margin-top:16px; font-size:0.9rem;">Signed KYC PDF is not available for this client.</p>
+          `;
+        }
+      } else {
+        pdfCard.innerHTML = `
+          <h3>Signed KYC Document <span class="status-badge" style="background:#dc3545; float:right;">Unavailable</span></h3>
+          <p style="color:var(--text-secondary); margin-top:16px; font-size:0.9rem;">Signed KYC PDF is not available for this client.</p>
+        `;
+      }
+    } catch (err) {
+      console.error("Failed to load signed PDF:", err);
+      pdfCard.innerHTML = `
+        <h3>Signed KYC Document <span class="status-badge" style="background:#dc3545; float:right;">Unavailable</span></h3>
+        <p style="color:var(--text-secondary); margin-top:16px; font-size:0.9rem;">Failed to retrieve PDF status.</p>
+      `;
+    }
 
   } catch (error) {
     grid.innerHTML = '<div class="error-msg">Failed to load client details.</div>';

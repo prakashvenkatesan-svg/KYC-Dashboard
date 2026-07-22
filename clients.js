@@ -239,6 +239,7 @@ const loadClients = async () => {
         ${integrationFilter === 'cdsl' ? `<td style="color: #dc3545; font-size: 0.85em;">${client.cdsl_rejection_reason || '-'}</td>` : ''}
         ${showTechexcel ? `<td>${renderStatusBadge(client.techexcel_push_status, client.techexcel_rejection_reason, 'TechExcel', client)}</td>` : ''}
         ${integrationFilter === 'techexcel' ? `<td style="color: #dc3545; font-size: 0.85em;">${client.techexcel_rejection_reason || '-'}</td>` : ''}
+        <td><a href="client-detail.html?code=${client.client_code}" onclick="event.stopPropagation();" style="color:var(--primary-color); text-decoration:none; font-weight:500;">Check PDF</a></td>
       `;
       
       tbody.appendChild(tr);

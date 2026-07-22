@@ -1,10 +1,11 @@
 let currentPage = 1;
 const limit = 20;
 let totalRecords = 0;
+let initialIntegration = null;
 
 document.addEventListener('DOMContentLoaded', () => {
   const urlParams = new URLSearchParams(window.location.search);
-  let initialIntegration = urlParams.get('integration');
+  initialIntegration = urlParams.get('integration');
   const path = window.location.pathname.toLowerCase();
   
   if (!initialIntegration) {

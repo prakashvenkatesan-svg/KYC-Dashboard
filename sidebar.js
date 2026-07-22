@@ -15,19 +15,19 @@ const sidebarHTML = `
         <i class="icon">👥</i> Clients
       </a>
       <a href="nse.html" class="nav-link" id="nav-nse">
-        <i class="icon">🔗</i> NSE
+        <img src="nse-logo.png" alt="NSE" class="icon" style="width: 20px; height: 20px; object-fit: contain; margin-right: 12px; border-radius: 4px; background: white; padding: 2px;"> NSE
       </a>
       <a href="bse.html" class="nav-link" id="nav-bse">
-        <i class="icon">🔗</i> BSE
+        <img src="bse-logo.png" alt="BSE" class="icon" style="width: 20px; height: 20px; object-fit: contain; margin-right: 12px; border-radius: 4px; background: white; padding: 2px;"> BSE
       </a>
       <a href="cvlkra.html" class="nav-link" id="nav-cvlkra">
-        <i class="icon">🔗</i> CVL KRA
+        <img src="cvlkra-logo.png" alt="CVL KRA" class="icon" style="width: 20px; height: 20px; object-fit: contain; margin-right: 12px; border-radius: 4px; background: white; padding: 2px;"> CVL KRA
       </a>
       <a href="cdsl.html" class="nav-link" id="nav-cdsl">
-        <i class="icon">🔗</i> CDSL
+        <img src="cdsl-logo.png" alt="CDSL" class="icon" style="width: 20px; height: 20px; object-fit: contain; margin-right: 12px; border-radius: 4px; background: white; padding: 2px;"> CDSL
       </a>
       <a href="techexcel.html" class="nav-link" id="nav-techexcel">
-        <i class="icon">🔗</i> TechExcel
+        <img src="techexcel-logo.png" alt="TechExcel" class="icon" style="width: 20px; height: 20px; object-fit: contain; margin-right: 12px; border-radius: 4px; background: white; padding: 2px;"> TechExcel
       </a>
     </nav>
   </aside>

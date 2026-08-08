@@ -16,7 +16,6 @@ const ALL_COLUMNS = {
   email_id: { label: 'EMAIL ID', mandatory: false },
   mobile_number: { label: 'MOBILE NUMBER', mandatory: false },
   current_stage: { label: 'CURRENT STAGE', mandatory: true },
-  kyc_status: { label: 'KYC STATUS', mandatory: false },
   cvlkra: { label: 'CVL KRA', mandatory: false },
   cvlkra_reason: { label: 'CVLKRA REJECTION REASON', mandatory: false },
   cdsl: { label: 'CDSL', mandatory: false },
@@ -34,7 +33,7 @@ const ALL_COLUMNS = {
 // Default visible columns and order for main clients page
 const DEFAULT_VISIBLE = [
   'application_date', 'client_code', 'client_name', 'pan_number', 'email_id', 'mobile_number',
-  'current_stage', 'kyc_status', 'cvlkra', 'cdsl', 'nse', 'bse', 'techexcel', 'esign_pdf', 'action'
+  'current_stage', 'cvlkra', 'cdsl', 'nse', 'bse', 'techexcel', 'esign_pdf', 'action'
 ];
 const DEFAULT_ORDER = [...DEFAULT_VISIBLE];
 
@@ -129,7 +128,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Default columns for integration pages (hide current_stage, show specific reason)
     const intDefaults = [
       'application_date', 'client_code', 'client_name', 'pan_number', 'email_id', 'mobile_number',
-      'current_stage', 'kyc_status', intName, `${intName}_reason`, 'esign_pdf', 'action'
+      'current_stage', intName, `${intName}_reason`, 'esign_pdf', 'action'
     ];
     visibleColumns = [...intDefaults];
     columnOrder = [...intDefaults];

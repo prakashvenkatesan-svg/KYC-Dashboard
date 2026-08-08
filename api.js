@@ -31,6 +31,31 @@ const parseApiResponse = async (res, fallbackMessage) => {
   };
 };
 
+window.applyTheme = (theme) => {
+  const isLight = theme === 'light';
+  document.body.classList.toggle('light-mode', isLight);
+
+  const toggles = document.querySelectorAll('.theme-toggle');
+  toggles.forEach(toggle => {
+    toggle.textContent = isLight ? 'Dark Mode' : 'Light Mode';
+    toggle.setAttribute('aria-label', isLight ? 'Switch to dark mode' : 'Switch to light mode');
+  });
+};
+
+window.initThemeToggle = () => {
+  const storedTheme = localStorage.getItem('kyc_dashboard_theme') || 'dark';
+  window.applyTheme(storedTheme);
+
+  const toggles = document.querySelectorAll('.theme-toggle');
+  toggles.forEach(toggle => {
+    toggle.addEventListener('click', () => {
+      const nextTheme = document.body.classList.contains('light-mode') ? 'dark' : 'light';
+      localStorage.setItem('kyc_dashboard_theme', nextTheme);
+      window.applyTheme(nextTheme);
+    });
+  });
+};
+
 // Global Auth Check & Logout setup
 const initAuth = () => {
   const token = localStorage.getItem('kyc_auth_token');
@@ -51,20 +76,24 @@ const initAuth = () => {
       const isAdmin = user.role === 'Admin';
       
       const profileHTML = `
-        <div class="profile-menu" id="profile-menu-toggle">
-          <div class="profile-avatar">${initials}</div>
-          <div class="profile-info">
-            <span class="profile-name">${user.full_name}</span>
-            <span class="profile-role">${user.role}</span>
-          </div>
-          <span class="dropdown-arrow">▼</span>
+        <div style="display: flex; align-items: center; gap: 16px;">
+          <button id="theme-toggle" class="theme-toggle" type="button" aria-label="Switch to light mode" style="background: var(--surface-color); border: 1px solid var(--surface-border); color: var(--text-primary); cursor: pointer; padding: 6px 10px; border-radius: 999px; font-weight: 600; font-size: 0.85rem; min-width: 104px; transition: all 0.3s; margin-right: 12px;">Light Mode</button>
           
-          <div class="profile-dropdown" id="profile-dropdown">
-            <a href="#" class="dropdown-item" id="menu-my-profile">My Profile</a>
-            ${isAdmin ? `<a href="#" class="dropdown-item" id="menu-edit-profile">Edit Profile</a>` : ''}
-            <a href="#" class="dropdown-item" id="menu-change-password">Change Password</a>
-            <a href="#" class="dropdown-item" id="menu-login-activity">Login Activity</a>
-            <a href="#" class="dropdown-item" id="menu-logout" style="color: #F87171;">Logout</a>
+          <div class="profile-menu" id="profile-menu-toggle">
+            <div class="profile-avatar">${initials}</div>
+            <div class="profile-info">
+              <span class="profile-name">${user.full_name}</span>
+              <span class="profile-role">${user.role}</span>
+            </div>
+            <span class="dropdown-arrow">▼</span>
+            
+            <div class="profile-dropdown" id="profile-dropdown">
+              <a href="#" class="dropdown-item" id="menu-my-profile">My Profile</a>
+              ${isAdmin ? `<a href="#" class="dropdown-item" id="menu-edit-profile">Edit Profile</a>` : ''}
+              <a href="#" class="dropdown-item" id="menu-change-password">Change Password</a>
+              <a href="#" class="dropdown-item" id="menu-login-activity">Login Activity</a>
+              <a href="#" class="dropdown-item" id="menu-logout" style="color: #F87171;">Logout</a>
+            </div>
           </div>
         </div>
       `;
@@ -97,6 +126,9 @@ const initAuth = () => {
         localStorage.removeItem('kyc_user');
         window.location.href = 'login.html';
       });
+
+      // Initialize theme toggle for all pages
+      window.initThemeToggle();
 
       // Inject Modal HTML into body if not exists
       if (!document.getElementById('profile-modal')) {

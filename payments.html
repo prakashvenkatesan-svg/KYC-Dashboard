@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Payments - KYC Operations</title>
+  <link rel="stylesheet" href="styles.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="layout">
+    <div id="sidebar-container"></div>
+    <main class="main-content">
+      <header class="top-header">
+        <h1 id="page-title">Payments</h1>
+        <div class="user-profile" style="display:flex; align-items:center; gap: 10px;">
+          <span id="logged-in-user">Loading...</span>
+          <button id="logout-btn" style="background:transparent; border:1px solid var(--border-color); color:var(--text-color); cursor:pointer; padding: 4px 8px; border-radius:4px;">Logout</button>
+        </div>
+      </header>
+
+      <div class="table-container">
+
+        <!-- Summary Cards -->
+        <div style="display: flex; gap: 16px; margin-bottom: 20px; flex-wrap: wrap;">
+          <div style="flex: 1; min-width: 220px; background: var(--surface-color); border: 1px solid var(--border-color); border-radius: 10px; padding: 16px 20px;">
+            <div style="font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px;">Total Transactions</div>
+            <div id="summary-total-count" style="font-size: 1.6rem; font-weight: 700; color: var(--text-primary);">—</div>
+            <div id="summary-total-amount" style="margin-top: 6px; font-size: 1rem; font-weight: 600; color: var(--text-secondary);">—</div>
+          </div>
+          <div style="flex: 1; min-width: 220px; background: var(--surface-color); border: 1px solid var(--border-color); border-radius: 10px; padding: 16px 20px;">
+            <div style="font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px;">Successful Transactions</div>
+            <div id="summary-success-count" style="font-size: 1.6rem; font-weight: 700; color: #22c55e;">—</div>
+            <div id="summary-success-amount" style="margin-top: 6px; font-size: 1rem; font-weight: 600; color: #22c55e;">—</div>
+          </div>
+          <div style="flex: 1; min-width: 220px; background: var(--surface-color); border: 1px solid var(--border-color); border-radius: 10px; padding: 16px 20px;">
+            <div style="font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px;">Pending Transactions</div>
+            <div id="summary-pending-count" style="font-size: 1.6rem; font-weight: 700; color: #eab308;">—</div>
+            <div id="summary-pending-amount" style="margin-top: 6px; font-size: 1rem; font-weight: 600; color: #eab308;">—</div>
+          </div>
+          <div style="flex: 1; min-width: 220px; background: var(--surface-color); border: 1px solid var(--border-color); border-radius: 10px; padding: 16px 20px;">
+            <div style="font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px;">Failed Transactions</div>
+            <div id="summary-failed-count" style="font-size: 1.6rem; font-weight: 700; color: #ef4444;">—</div>
+            <div id="summary-failed-amount" style="margin-top: 6px; font-size: 1rem; font-weight: 600; color: #ef4444;">—</div>
+          </div>
+        </div>
+
+        <!-- Filters -->
+        <div class="controls" style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 20px;">
+          <input type="text" id="search-client" placeholder="Client Name" style="flex: 0 1 180px; padding: 8px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-color);">
+          <input type="text" id="search-mobile" placeholder="Mobile Number" style="flex: 0 1 160px; padding: 8px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-color);">
+          <input type="text" id="search-txn" placeholder="Transaction ID" style="flex: 0 1 200px; padding: 8px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-color);">
+
+          <select id="status-filter" style="padding: 8px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-color);">
+            <option value="">All Statuses</option>
+            <option value="Success">Success</option>
+            <option value="Pending">Pending</option>
+            <option value="Failed">Failed</option>
+          </select>
+
+          <input type="date" id="from-date" style="padding: 8px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-color);" title="From Date">
+          <input type="date" id="to-date" style="padding: 8px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-color);" title="To Date">
+
+          <button id="export-btn" style="padding: 8px 16px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--primary-color); color: white; cursor: pointer; font-weight: 500; display: flex; align-items: center; gap: 6px;">⬇ Export Report</button>
+        </div>
+
+        <!-- Table -->
+        <div class="table-wrapper" style="overflow-x: auto; max-width: 100%; border: 1px solid var(--border-color); border-radius: 8px;">
+          <table style="width: 100%; border-collapse: collapse; min-width: 900px;">
+            <thead>
+              <tr>
+                <th>CLIENT NAME</th>
+                <th>MOBILE NUMBER</th>
+                <th>TRANSACTION ID</th>
+                <th data-sort="amount" style="cursor: pointer; user-select: none;">AMOUNT <span id="sort-icon-amount" style="font-size:12px; margin-left:4px;"></span></th>
+                <th data-sort="payment_date" style="cursor: pointer; user-select: none;">PAYMENT DATE <span id="sort-icon-date" style="font-size:12px; margin-left:4px;">↓</span></th>
+                <th>STATUS</th>
+              </tr>
+            </thead>
+            <tbody id="payments-tbody">
+              <tr>
+                <td colspan="6" style="text-align: center;">Loading...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Pagination -->
+        <div class="pagination" style="display: flex; justify-content: space-between; align-items: center; margin-top: 20px;">
+          <span id="page-info">Showing 0 of 0</span>
+          <div style="display: flex; gap: 8px;">
+            <button id="prev-btn" style="padding: 6px 12px; cursor: pointer; background: var(--surface-color); border: 1px solid var(--border-color); color: var(--text-color); border-radius: 4px;" disabled>Previous</button>
+            <button id="next-btn" style="padding: 6px 12px; cursor: pointer; background: var(--surface-color); border: 1px solid var(--border-color); color: var(--text-color); border-radius: 4px;" disabled>Next</button>
+          </div>
+        </div>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="api.js"></script>
+  <script src="sidebar.js"></script>
+  <script src="payments.js"></script>
+</body>
+</html>

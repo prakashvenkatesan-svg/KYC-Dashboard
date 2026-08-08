@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Client Details - KYC Operations</title>
+  <link rel="stylesheet" href="styles.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="layout">
+    <div id="sidebar-container"></div>
+    <main class="main-content">
+      <header class="top-header" style="margin-bottom: 20px;">
+        <div>
+          <a href="clients.html" class="back-link">← Back to Clients</a>
+          <h1 id="client-name">Loading...</h1>
+          <p class="subtitle" id="client-code-pan"></p>
+        </div>
+        <h1>Client Details</h1>
+        <div class="user-profile" style="display:flex; align-items:center; gap: 10px;">
+          <span id="logged-in-user">Loading...</span>
+          <button id="logout-btn" style="background:transparent; border:1px solid var(--border-color); color:var(--text-color); cursor:pointer; padding: 4px 8px; border-radius:4px;">Logout</button>
+        </div>
+      </header>
+      
+      <div style="display:flex; gap: 24px; align-items: stretch; max-width: 100%; min-height: calc(100vh - 140px);">
+        
+        <!-- Column 1: Modules (Accordion) -->
+        <div id="modules-container" style="flex: 0 0 300px; background: var(--surface-color); border: 1px solid var(--surface-border); border-radius: 8px; display: flex; flex-direction: column; overflow: hidden;">
+          <div style="padding: 12px 16px; background: #e2e8f0; border-bottom: 1px solid var(--surface-border); font-weight: 600; text-align: center; color: #1e293b;">Modules</div>
+          <div id="modules-accordion" style="overflow-y: auto; flex: 1;">
+            <div class="loading" style="padding: 16px;">Loading modules...</div>
+          </div>
+        </div>
+
+        <!-- Column 2: Documents -->
+        <div id="documents-container" style="flex: 0 0 250px; background: var(--surface-color); border: 1px solid var(--surface-border); border-radius: 8px; display: flex; flex-direction: column; overflow: hidden;">
+          <div style="padding: 12px 16px; background: #e2e8f0; border-bottom: 1px solid var(--surface-border); font-weight: 600; text-align: center; color: #1e293b;">Documents</div>
+          <div id="documents-list" style="overflow-y: auto; flex: 1; padding: 8px 0;">
+            <div class="loading" style="padding: 16px;">Scanning documents...</div>
+          </div>
+        </div>
+
+        <!-- Column 3: Preview -->
+        <div id="preview-container" style="flex: 1; background: var(--surface-color); border: 1px solid var(--surface-border); border-radius: 8px; display: flex; flex-direction: column; overflow: hidden;">
+          <div style="padding: 12px 16px; background: #e2e8f0; border-bottom: 1px solid var(--surface-border); font-weight: 600; display: flex; justify-content: space-between; align-items: center; color: #1e293b;">
+            <span>Preview</span>
+            <span id="preview-title" style="font-size: 0.9rem; font-weight: 400;">No Document Selected</span>
+          </div>
+          <div id="preview-pane" style="flex: 1; background: #334155; display: flex; align-items: center; justify-content: center; overflow: hidden; position: relative;">
+            <p style="color: #cbd5e1;">Select a document to preview</p>
+          </div>
+          <div style="padding: 12px 16px; border-top: 1px solid var(--surface-border); display: flex; justify-content: space-between;">
+            <button id="upload-file-btn" style="padding: 8px 16px; border: 1px solid var(--border-color); background: transparent; border-radius: 4px; cursor: pointer;">Upload File</button>
+            <div>
+              <button style="padding: 8px 16px; border: 1px solid var(--border-color); background: transparent; border-radius: 4px; cursor: pointer; margin-right: 8px;">Save</button>
+              <button style="padding: 8px 16px; border: none; background: #2563eb; color: white; border-radius: 4px; cursor: pointer; font-weight: 600;">Save & Generate PDF</button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </main>
+  </div>
+
+  <div id="skip-modal" class="modal-overlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); z-index:1000; align-items:center; justify-content:center;">
+    <div class="modal-content" style="background:var(--surface-color); padding:24px; border-radius:12px; width:400px; border:1px solid var(--surface-border); backdrop-filter:blur(10px);">
+      <h3 style="margin-bottom:16px;">Skip Payment</h3>
+      <p style="font-size:0.9rem; color:var(--text-secondary); margin-bottom:16px;">Please provide a reason for skipping this payment.</p>
+      <textarea id="skip-reason" placeholder="Enter reason..." style="width:100%; height:80px; padding:8px; border-radius:6px; background:rgba(0,0,0,0.2); border:1px solid var(--border-color); color:var(--text-primary); margin-bottom:16px; font-family:inherit;"></textarea>
+      <div style="display:flex; justify-content:flex-end; gap:12px;">
+        <button id="cancel-skip-btn" style="padding:8px 16px; border-radius:6px; border:none; cursor:pointer; background:#334155; color:white;">Cancel</button>
+        <button id="confirm-skip-btn" style="padding:8px 16px; border-radius:6px; border:none; cursor:pointer; background:var(--primary-color); color:white; font-weight:bold;">Confirm Skip</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="bypass-modal" class="modal-overlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); z-index:1000; align-items:center; justify-content:center;">
+    <div class="modal-content" style="background:var(--surface-color); padding:24px; border-radius:12px; width:450px; border:1px solid var(--surface-border); backdrop-filter:blur(10px);">
+      <h3 style="margin-bottom:16px;">Allow Payment Bypass</h3>
+      <p style="font-size:0.9rem; color:var(--text-secondary); margin-bottom:16px;">
+        This client has already completed the payment successfully.<br><br>
+        Approving this action will allow the client to bypass the payment stage and continue the remaining KYC process. The original payment transaction will not be modified.<br><br>
+        Do you want to continue?
+      </p>
+      
+      <div style="background:rgba(0,0,0,0.2); padding:12px; border-radius:8px; margin-bottom:16px; font-size:0.85rem;">
+        <div><strong>Transaction ID:</strong> <span id="bypass-txnid"></span></div>
+        <div><strong>Amount:</strong> ₹<span id="bypass-amount"></span></div>
+      </div>
+
+      <input type="text" id="bypass-rm-ref" placeholder="RM Confirmation Reference (e.g. RM Name/Code)" style="width:100%; padding:10px; border-radius:6px; background:rgba(0,0,0,0.2); border:1px solid var(--border-color); color:var(--text-primary); margin-bottom:12px; font-family:inherit;">
+      <textarea id="bypass-reason" placeholder="Reason for Bypass..." style="width:100%; height:60px; padding:10px; border-radius:6px; background:rgba(0,0,0,0.2); border:1px solid var(--border-color); color:var(--text-primary); margin-bottom:16px; font-family:inherit;"></textarea>
+      
+      <div style="display:flex; justify-content:flex-end; gap:12px;">
+        <button id="cancel-bypass-btn" style="padding:8px 16px; border-radius:6px; border:none; cursor:pointer; background:#334155; color:white;">Cancel</button>
+        <button id="confirm-bypass-btn" style="padding:8px 16px; border-radius:6px; border:none; cursor:pointer; background:#10B981; color:white; font-weight:bold;">Confirm and Allow Bypass</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="stage-details-modal" class="modal-overlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); z-index:1000; align-items:center; justify-content:center;">
+    <div class="modal-content" style="background:var(--surface-color); padding:24px; border-radius:12px; width:500px; max-width:90%; border:1px solid var(--surface-border); backdrop-filter:blur(10px); max-height:80vh; overflow-y:auto;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; border-bottom:1px solid var(--border-color); padding-bottom:12px;">
+        <h3 id="stage-details-title" style="margin:0;">Stage Details</h3>
+        <button id="close-stage-details-btn" style="background:transparent; border:none; font-size:1.5rem; color:var(--text-muted); cursor:pointer;">&times;</button>
+      </div>
+      <div id="stage-details-body" style="font-size:0.95rem; line-height:1.6;">
+        <!-- Dynamic content injected here -->
+      </div>
+    </div>
+  </div>
+
+  <script src="api.js"></script>
+  <script src="sidebar.js"></script>
+  <script src="client-detail.js?v=3"></script>
+</body>
+</html>

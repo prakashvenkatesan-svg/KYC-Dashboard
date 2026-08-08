@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard - KYC Operations</title>
+  <link rel="stylesheet" href="styles.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="layout">
+    <div id="sidebar-container"></div>
+    <main class="main-content">
+      <header class="top-header">
+        <h1 id="page-title">Dashboard Summary</h1>
+        <div class="user-profile" style="display:flex; align-items:center; gap: 10px;">
+          <button id="theme-toggle" class="theme-toggle" type="button" aria-label="Switch to light mode">Light Mode</button>
+          <span id="logged-in-user">Loading...</span>
+          <button id="logout-btn" style="background:transparent; border:1px solid var(--surface-border); color:var(--text-primary); cursor:pointer; padding: 4px 8px; border-radius:4px;">Logout</button>
+        </div>
+      </header>
+      
+      <div class="dashboard-content">
+        <p class="subtitle">Overview of external integration push statuses</p>
+
+        <section id="push-operations-section" class="push-operations-section" style="display:none;">
+          <div class="section-heading-row">
+            <div>
+              <h2>Push Operations</h2>
+              <p>Live completed eSign applications only. Test entries are excluded.</p>
+            </div>
+            <span class="admin-only-badge">Admin Report</span>
+          </div>
+
+          <div id="push-kpi-container" class="push-kpi-grid">
+            <div class="loading">Loading push report...</div>
+          </div>
+
+          <div id="blocker-summary-container" class="blocker-summary"></div>
+
+          <div class="needs-attention-panel">
+            <div class="section-heading-row compact">
+              <div>
+                <h2>Needs Attention</h2>
+                <p>Applications are ordered by blocker first, then latest activity.</p>
+              </div>
+            </div>
+            <div class="operations-table-wrapper">
+              <table class="operations-table">
+                <thead>
+                  <tr>
+                    <th>Application</th>
+                    <th>Client</th>
+                    <th>PAN</th>
+                    <th>Client Code</th>
+                    <th>BO ID</th>
+                    <th>Blocker</th>
+                    <th>Last Error / Note</th>
+                    <th>Suggested Next Action</th>
+                    <th>Updated</th>
+                  </tr>
+                </thead>
+                <tbody id="needs-attention-body">
+                  <tr>
+                    <td colspan="9">Loading...</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+        
+        <div id="metrics-container" class="metrics-grid">
+          <!-- Metric cards will be injected here -->
+          <div class="loading">Loading metrics...</div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="api.js"></script>
+  <script src="sidebar.js"></script>
+  <script src="dashboard.js"></script>
+</body>
+</html>

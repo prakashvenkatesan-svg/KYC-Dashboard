@@ -187,47 +187,38 @@ document.addEventListener('DOMContentLoaded', async () => {
   renderTableHeaders();
   setupClientExportUI();
   
-  document.getElementById('search-btn').addEventListener('click', () => {
-    currentPage = 1;
-    saveClientListState();
-    loadClients();
-  });
+  const searchInput = document.getElementById('search-input');
+  if (searchInput) {
+    searchInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        currentPage = 1;
+        saveClientListState();
+        loadClients();
+      }
+    });
+    searchInput.addEventListener('input', (e) => {
+      if (e.target.value.trim() === '') {
+        currentPage = 1;
+        saveClientListState();
+        loadClients();
+      }
+    });
+  }
+
+  const filtersToBind = [
+    document.getElementById('current-stage-filter'),
+    document.getElementById('status-filter'),
+    document.getElementById('from-date'),
+    document.getElementById('to-date')
+  ];
   
-  document.getElementById('reset-btn').addEventListener('click', () => {
-    const searchInput = document.getElementById('search-input');
-    if (searchInput) searchInput.value = '';
-    
-    if (!initialIntegration) {
-      const intFilter = document.getElementById('integration-filter');
-      if (intFilter) intFilter.value = '';
-    }
-    
-    const statusFilter = document.getElementById('status-filter');
-    if (statusFilter) statusFilter.value = '';
-    
-    const stageFilter = document.getElementById('current-stage-filter');
-    if (stageFilter) stageFilter.value = '';
-    
-    const fromDate = document.getElementById('from-date');
-    if (fromDate) fromDate.value = '';
-    
-    const toDate = document.getElementById('to-date');
-    if (toDate) toDate.value = '';
-
-    sidebarKycStatus = '';
-    sidebarKycStatusNavTriggered = false;
-    sessionStorage.removeItem('kyc_sidebar_status_nav');
-    if (window.history && window.history.replaceState) {
-      window.history.replaceState(null, '', window.location.pathname);
-    }
-    
-    currentPage = 1;
-    sessionStorage.removeItem(CLIENT_LIST_STATE_KEY);
-    loadClients();
+  if (!initialIntegration) {
+    filtersToBind.push(document.getElementById('integration-filter'));
+  }
+  
+  filtersToBind.forEach(filter => {
+    if (filter) bindChangeToRefresh(filter);
   });
-
-  const stageFilter = document.getElementById('current-stage-filter');
-  bindChangeToRefresh(stageFilter);
   
   document.getElementById('prev-btn').addEventListener('click', () => {
     if (currentPage > 1) {

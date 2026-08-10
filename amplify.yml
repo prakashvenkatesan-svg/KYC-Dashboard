@@ -1,11 +1,17 @@
 version: 1
 frontend:
   phases:
+    preBuild:
+      commands:
+        - cd frontend-react
+        - npm install
     build:
-      commands: []
+      commands:
+        - npm run build
   artifacts:
-    baseDirectory: .
+    baseDirectory: frontend-react/dist
     files:
       - '**/*'
   cache:
-    paths: []
+    paths:
+      - frontend-react/node_modules/**/*

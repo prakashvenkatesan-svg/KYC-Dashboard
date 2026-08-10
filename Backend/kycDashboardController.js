@@ -714,5 +714,6 @@ module.exports = {
   getClientKycStages,
   getIntegrationRecords,
   getPayments,
-  editClientField
+  editClientField,
+  getStageTimestamps
 };

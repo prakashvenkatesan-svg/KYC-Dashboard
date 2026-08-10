@@ -42,7 +42,7 @@ const sidebarHTML = `
       <a href="dashboard.html" class="nav-link" id="nav-dashboard">
         <i class="icon">&#128202;</i> Dashboard
       </a>
-      <a href="clients.html" class="nav-link" id="nav-clients">
+      <a href="/clients.html" class="nav-link" id="nav-clients">
         <i class="icon">&#128101;</i> Clients
       </a>
       <a href="payments.html" class="nav-link" id="nav-payments">
@@ -85,7 +85,7 @@ const sidebarHTML = `
           </a>
         </div>
       </div>
-      <a href="trash.html" class="nav-link" id="nav-trash">
+      <a href="/trash.html" class="nav-link" id="nav-trash">
         <i class="icon" style="font-style:normal;">&#128465;</i> Trash
       </a>
     </nav>
@@ -165,6 +165,7 @@ function renderSidebar() {
       integrationMenu.classList.toggle('expanded', isOpen);
       integrationSubmenu.classList.toggle('open', isOpen);
       integrationToggle.setAttribute('aria-expanded', String(isOpen));
+      integrationArrow.textContent = isOpen ? '&#9662;' : '&#8250;';
       integrationArrow.textContent = isOpen ? '▾' : '›';
       if (persist) localStorage.setItem(SIDEBAR_STATE_KEY, String(isOpen));
     };
@@ -222,6 +223,16 @@ function renderSidebar() {
       link.classList.add('active');
     } else if (linkHref === 'clients.html' && path.includes('clients.html') && !link.dataset.kycStatus) {
       link.classList.add('active');
+    } else if (linkHref === 'nse.html' && path.includes('nse.html')) {
+      link.classList.add('active');
+    } else if (linkHref === 'bse.html' && path.includes('bse.html')) {
+      link.classList.add('active');
+    } else if (linkHref === 'cvlkra.html' && path.includes('cvlkra.html')) {
+      link.classList.add('active');
+    } else if (linkHref === 'cdsl.html' && path.includes('cdsl.html')) {
+      link.classList.add('active');
+    } else if (linkHref === 'techexcel.html' && path.includes('techexcel.html')) {
+      link.classList.add('active');
     } else if (linkHref === 'payments.html' && path.includes('payments.html')) {
       link.classList.add('active');
     } else if (linkHref === 'trash.html' && path.includes('trash.html')) {
@@ -231,7 +242,7 @@ function renderSidebar() {
         link.classList.add('active');
         if (kycStatusMenu) kycStatusMenu.classList.add('active');
       }
-    } else if (integrationPage && linkHref === integrationPage.href) {
+    } else if (INTEGRATION_ITEMS.some(item => item.href === linkHref) && integrationPage && linkHref === integrationPage.href) {
       link.classList.add('active');
       if (integrationMenu) integrationMenu.classList.add('active');
     }

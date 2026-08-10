@@ -1,0 +1,13 @@
+node_modules/
+dist/
+build/
+.env
+.DS_Store
+
+
+# Runtime files – do not push to GitHub
+# KYC runtime documents - never commit
+/server/uploads/
+/server/generated-pdfs/
+/uploads/
+tmp/

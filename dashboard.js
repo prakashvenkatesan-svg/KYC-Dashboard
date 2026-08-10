@@ -39,6 +39,30 @@ const getLastMessage = (app) => {
     || '';
 };
 
+const applyTheme = (theme) => {
+  const isLight = theme === 'light';
+  document.body.classList.toggle('light-mode', isLight);
+
+  const toggle = document.getElementById('theme-toggle');
+  if (!toggle) return;
+
+  toggle.textContent = isLight ? 'Dark Mode' : 'Light Mode';
+  toggle.setAttribute('aria-label', isLight ? 'Switch to dark mode' : 'Switch to light mode');
+};
+
+const initThemeToggle = () => {
+  const storedTheme = localStorage.getItem('kyc_dashboard_theme') || 'dark';
+  applyTheme(storedTheme);
+
+  const toggle = document.getElementById('theme-toggle');
+  if (!toggle) return;
+
+  toggle.addEventListener('click', () => {
+    const nextTheme = document.body.classList.contains('light-mode') ? 'dark' : 'light';
+    localStorage.setItem('kyc_dashboard_theme', nextTheme);
+    applyTheme(nextTheme);
+  });
+};
 
 const renderPushKpis = (report) => {
   const container = document.getElementById('push-kpi-container');
@@ -199,6 +223,8 @@ const renderIntegrationCards = async () => {
 };
 
 document.addEventListener('DOMContentLoaded', async () => {
+  initThemeToggle();
+
   await Promise.all([
     renderPushOperationsReport(),
     renderIntegrationCards()

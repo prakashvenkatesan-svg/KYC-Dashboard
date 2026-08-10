@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Trash – KYC Operations</title>
+  <link rel="stylesheet" href="styles.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    .trash-tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border-color); margin-bottom: 24px; }
+    .trash-tab { padding: 10px 20px; background: transparent; border: none; color: var(--text-muted); cursor: pointer; font-size: 0.9rem; border-bottom: 2px solid transparent; transition: all 0.2s; }
+    .trash-tab.active { color: var(--primary-color); border-bottom-color: var(--primary-color); font-weight: 600; }
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+    .audit-table { width: 100%; border-collapse: collapse; font-size: 0.87rem; }
+    .audit-table th { background: var(--surface-color); padding: 10px 14px; text-align: left; font-weight: 600; color: var(--text-muted); font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.04em; border-bottom: 1px solid var(--border-color); }
+    .audit-table td { padding: 10px 14px; border-bottom: 1px solid rgba(255,255,255,0.05); color: var(--text-primary); vertical-align: top; }
+    .audit-table tr:hover td { background: rgba(255,255,255,0.02); }
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 0.75rem; font-weight: 600; }
+    .badge-danger { background: rgba(248,113,113,0.15); color: #F87171; }
+    .badge-warning { background: rgba(245,158,11,0.15); color: #f59e0b; }
+    .badge-info { background: rgba(99,102,241,0.15); color: #818cf8; }
+    .days-badge { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 0.75rem; font-weight: 700; }
+    .empty-state { text-align: center; padding: 60px 20px; color: var(--text-muted); }
+    .empty-state .icon { font-size: 3rem; margin-bottom: 12px; }
+    .restore-btn { padding: 4px 10px; border-radius: 6px; border: 1px solid var(--primary-color); background: transparent; color: var(--primary-color); cursor: pointer; font-size: 0.8rem; margin-right: 6px; }
+    .restore-btn:hover { background: var(--primary-color); color: white; }
+    .perma-delete-btn { padding: 4px 10px; border-radius: 6px; border: 1px solid #F87171; background: transparent; color: #F87171; cursor: pointer; font-size: 0.8rem; }
+    .perma-delete-btn:hover { background: #F87171; color: white; }
+    .section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+    .summary-cards { display: flex; gap: 16px; margin-bottom: 24px; flex-wrap: wrap; }
+    .summary-card { background: var(--surface-color); border: 1px solid var(--border-color); border-radius: 10px; padding: 16px 24px; min-width: 160px; }
+    .summary-card .sc-value { font-size: 1.8rem; font-weight: 700; }
+    .summary-card .sc-label { font-size: 0.8rem; color: var(--text-muted); margin-top: 4px; }
+  </style>
+</head>
+<body>
+  <div class="layout">
+    <div id="sidebar-container"></div>
+    <main class="main-content">
+      <header class="top-header">
+        <h1>🗑 Trash & Audit Logs</h1>
+        <div class="user-profile" style="display:flex; align-items:center; gap: 10px;">
+          <span id="logged-in-user">Loading...</span>
+        </div>
+      </header>
+
+      <div class="table-container">
+
+        <!-- Summary Cards -->
+        <div class="summary-cards">
+          <div class="summary-card">
+            <div class="sc-value" id="sc-trash-count" style="color:#F87171;">0</div>
+            <div class="sc-label">In Trash</div>
+          </div>
+          <div class="summary-card">
+            <div class="sc-value" id="sc-delete-logs" style="color:#6366f1;">0</div>
+            <div class="sc-label">Delete Audit Logs</div>
+          </div>
+          <div class="summary-card">
+            <div class="sc-value" id="sc-payment-logs" style="color:#f59e0b;">0</div>
+            <div class="sc-label">Payment Skip Logs</div>
+          </div>
+          <div class="summary-card">
+            <div class="sc-value" id="sc-stepback-logs" style="color:#10B981;">0</div>
+            <div class="sc-label">Step Back Logs</div>
+          </div>
+        </div>
+
+        <!-- Tabs -->
+        <div class="trash-tabs">
+          <button class="trash-tab active" onclick="switchTab('tab-trash')">🗑 Trash</button>
+          <button class="trash-tab" onclick="switchTab('tab-delete-log')">📋 Delete Audit Log</button>
+          <button class="trash-tab" onclick="switchTab('tab-payment-log')">⏭ Payment Skip Log</button>
+          <button class="trash-tab" onclick="switchTab('tab-stepback-log')">↩ Step Back Log</button>
+        </div>
+
+        <!-- TRASH TAB -->
+        <div id="tab-trash" class="tab-panel active">
+          <div class="section-header">
+            <p style="margin:0; color:var(--text-muted); font-size:0.88rem;">Records deleted in the last 10 days. Auto-purged after 10 days.</p>
+            <button onclick="clearExpiredTrash()" style="padding:6px 14px; border-radius:8px; border:1px solid var(--border-color); background:transparent; color:var(--text-muted); cursor:pointer; font-size:0.82rem;">🧹 Clear Expired</button>
+          </div>
+          <div class="table-wrapper" style="overflow-x:auto; border:1px solid var(--border-color); border-radius:8px;">
+            <table class="audit-table">
+              <thead>
+                <tr>
+                  <th>APPLICATION ID</th>
+                  <th>CLIENT NAME</th>
+                  <th>DELETED BY</th>
+                  <th>ROLE</th>
+                  <th>DELETED AT</th>
+                  <th>DAYS LEFT</th>
+                  <th>REASON</th>
+                  <th>ACTIONS</th>
+                </tr>
+              </thead>
+              <tbody id="trash-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- DELETE AUDIT LOG TAB -->
+        <div id="tab-delete-log" class="tab-panel">
+          <div class="section-header">
+            <p style="margin:0; color:var(--text-muted); font-size:0.88rem;">Permanent deletion audit log. Records retained indefinitely.</p>
+            <button onclick="exportLog('delete')" style="padding:6px 14px; border-radius:8px; border:1px solid var(--primary-color); background:transparent; color:var(--primary-color); cursor:pointer; font-size:0.82rem;">⬇ Export CSV</button>
+          </div>
+          <div class="table-wrapper" style="overflow-x:auto; border:1px solid var(--border-color); border-radius:8px;">
+            <table class="audit-table">
+              <thead>
+                <tr>
+                  <th>APPLICATION ID</th>
+                  <th>CLIENT NAME</th>
+                  <th>DELETED BY</th>
+                  <th>USER ROLE</th>
+                  <th>DATE & TIME</th>
+                  <th>REASON / REMARKS</th>
+                </tr>
+              </thead>
+              <tbody id="delete-log-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- PAYMENT SKIP LOG TAB -->
+        <div id="tab-payment-log" class="tab-panel">
+          <div class="section-header">
+            <p style="margin:0; color:var(--text-muted); font-size:0.88rem;">Payment skip audit log. Records retained indefinitely.</p>
+            <button onclick="exportLog('payment_skip')" style="padding:6px 14px; border-radius:8px; border:1px solid var(--primary-color); background:transparent; color:var(--primary-color); cursor:pointer; font-size:0.82rem;">⬇ Export CSV</button>
+          </div>
+          <div class="table-wrapper" style="overflow-x:auto; border:1px solid var(--border-color); border-radius:8px;">
+            <table class="audit-table">
+              <thead>
+                <tr>
+                  <th>APPLICATION ID</th>
+                  <th>CLIENT NAME</th>
+                  <th>SKIPPED BY</th>
+                  <th>USER ROLE</th>
+                  <th>PAYMENT STATUS BEFORE</th>
+                  <th>DATE & TIME</th>
+                  <th>REASON / REMARKS</th>
+                </tr>
+              </thead>
+              <tbody id="payment-log-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- STEP BACK LOG TAB -->
+        <div id="tab-stepback-log" class="tab-panel">
+          <div class="section-header">
+            <p style="margin:0; color:var(--text-muted); font-size:0.88rem;">Step back audit log. Records retained indefinitely.</p>
+            <button onclick="exportLog('step_back')" style="padding:6px 14px; border-radius:8px; border:1px solid var(--primary-color); background:transparent; color:var(--primary-color); cursor:pointer; font-size:0.82rem;">⬇ Export CSV</button>
+          </div>
+          <div class="table-wrapper" style="overflow-x:auto; border:1px solid var(--border-color); border-radius:8px;">
+            <table class="audit-table">
+              <thead>
+                <tr>
+                  <th>APPLICATION ID</th>
+                  <th>CLIENT NAME</th>
+                  <th>MOVED BY</th>
+                  <th>USER ROLE</th>
+                  <th>PREVIOUS STAGE</th>
+                  <th>NEW STAGE</th>
+                  <th>DATE & TIME</th>
+                  <th>REASON / REMARKS</th>
+                </tr>
+              </thead>
+              <tbody id="stepback-log-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="api.js"></script>
+  <script src="sidebar.js"></script>
+  <script src="trash.js"></script>
+</body>
+</html>

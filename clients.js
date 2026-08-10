@@ -16,6 +16,7 @@ const ALL_COLUMNS = {
   email_id: { label: 'EMAIL ID', mandatory: false },
   mobile_number: { label: 'MOBILE NUMBER', mandatory: false },
   current_stage: { label: 'CURRENT STAGE', mandatory: true },
+  kyc_status: { label: 'KYC STATUS', mandatory: false },
   cvlkra: { label: 'CVL KRA', mandatory: false },
   cvlkra_reason: { label: 'CVLKRA REJECTION REASON', mandatory: false },
   cdsl: { label: 'CDSL', mandatory: false },
@@ -27,13 +28,13 @@ const ALL_COLUMNS = {
   techexcel: { label: 'TECHEXCEL', mandatory: false },
   techexcel_reason: { label: 'TECHEXCEL REJECTION REASON', mandatory: false },
   esign_pdf: { label: 'ESIGN PDF', mandatory: false }, // The PDF check link
-  action: { label: 'ACTION/EDIT', mandatory: false } // Action menu
+  action: { label: 'ACTION/EDIT', mandatory: true } // Always visible action column
 };
 
 // Default visible columns and order for main clients page
 const DEFAULT_VISIBLE = [
   'application_date', 'client_code', 'client_name', 'pan_number', 'email_id', 'mobile_number',
-  'current_stage', 'cvlkra', 'cdsl', 'nse', 'bse', 'techexcel', 'esign_pdf', 'action'
+  'current_stage', 'kyc_status', 'cvlkra', 'cdsl', 'nse', 'bse', 'techexcel', 'esign_pdf', 'action'
 ];
 const DEFAULT_ORDER = [...DEFAULT_VISIBLE];
 
@@ -68,7 +69,6 @@ function restoreClientListState() {
     const raw = sessionStorage.getItem(CLIENT_LIST_STATE_KEY);
     if (!raw) return;
     const state = JSON.parse(raw);
-
     const searchInput = document.getElementById('search-input');
     const integrationFilter = document.getElementById('integration-filter');
     const statusFilter = document.getElementById('status-filter');
@@ -77,7 +77,11 @@ function restoreClientListState() {
     const toDate = document.getElementById('to-date');
 
     if (searchInput && typeof state.search === 'string') searchInput.value = state.search;
-    if (!initialIntegration && integrationFilter && typeof state.integration === 'string') integrationFilter.value = state.integration;
+
+    if (!initialIntegration && integrationFilter && typeof state.integration === 'string') {
+      integrationFilter.value = state.integration;
+    }
+
     if (statusFilter && typeof state.status === 'string') statusFilter.value = state.status;
     if (stageFilter && typeof state.currentStage === 'string') stageFilter.value = state.currentStage;
     if (fromDate && typeof state.fromDate === 'string') fromDate.value = state.fromDate;
@@ -100,6 +104,123 @@ function normalizeKycStatusValue(value) {
     .trim()
     .toLowerCase()
     .replace(/\s+/g, '_');
+}
+
+const KYC_STEP_SEQUENCE = [
+  'Mobile Verification',
+  'Email Verification',
+  'PAN Number Verification',
+  'DigiLocker',
+  'Bank Details',
+  'Personal Details',
+  'Nominee Details',
+  'Live Image',
+  'Signature Upload',
+  'Payment Summary',
+  'eSign'
+];
+
+const KYC_STEP_ALIASES = {
+  'mobile verification': 'Mobile Verification',
+  'mobile_verification': 'Mobile Verification',
+  'email verification': 'Email Verification',
+  'email_verification': 'Email Verification',
+  'pan number verification': 'PAN Number Verification',
+  'pan and dob verification': 'PAN Number Verification',
+  'pan_details': 'PAN Number Verification',
+  'pan details': 'PAN Number Verification',
+  'digilocker': 'DigiLocker',
+  'digilocker details': 'DigiLocker',
+  'digilocker_details': 'DigiLocker',
+  'bank details': 'Bank Details',
+  'bank_details': 'Bank Details',
+  'personal details': 'Personal Details',
+  'personal_details': 'Personal Details',
+  'nominee details': 'Nominee Details',
+  'nominee_details': 'Nominee Details',
+  'live image': 'Live Image',
+  'live photo': 'Live Image',
+  'live_photo': 'Live Image',
+  'signature upload': 'Signature Upload',
+  'signature': 'Signature Upload',
+  'signature_upload': 'Signature Upload',
+  'payment summary': 'Payment Summary',
+  'scheme details': 'Payment Summary',
+  'scheme selection': 'Payment Summary',
+  'payment': 'Payment Summary',
+  'esign': 'eSign',
+  'e sign': 'eSign'
+};
+
+function normalizeStepName(step) {
+  return String(step || '')
+    .toLowerCase()
+    .replace(/\(.*?\)/g, '')
+    .replace(/[_-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function getFriendlyStepName(step) {
+  const normalized = normalizeStepName(step);
+  return KYC_STEP_ALIASES[normalized] || KYC_STEP_SEQUENCE.find(item => normalizeStepName(item) === normalized) || (step ? String(step) : 'Not Started');
+}
+
+function formatCurrentStage(currentStep) {
+  const step = String(currentStep || '')
+    .toLowerCase()
+    .replace(/\(.*?\)/g, '')
+    .trim();
+
+  const formattedStep = step
+    .replace(/[_-]+/g, ' ')
+    .replace(/\b\w/g, (char) => char.toUpperCase())
+    .trim();
+  return formattedStep || 'N/A';
+}
+
+function getStepIndex(step) {
+  return KYC_STEP_SEQUENCE.indexOf(getFriendlyStepName(step));
+}
+
+function buildStepOptions(currentStep, moveDirection) {
+  const currentIndex = getStepIndex(currentStep);
+  return KYC_STEP_SEQUENCE.map((step, index) => {
+    let disabled = false;
+    if (currentIndex >= 0) {
+      if (moveDirection === 'previous') {
+        disabled = index >= currentIndex;
+      } else if (moveDirection === 'next') {
+        disabled = index <= currentIndex;
+      }
+    }
+    return `<option value="${step}" ${disabled ? 'disabled' : ''}>${step}</option>`;
+  }).join('');
+}
+
+function getDefaultMoveDirection(currentStep) {
+  const currentIndex = getStepIndex(currentStep);
+  if (currentIndex > 0) return 'previous';
+  if (currentIndex >= 0 && currentIndex < KYC_STEP_SEQUENCE.length - 1) return 'next';
+  return 'previous';
+}
+
+function getBackendStepKey(step) {
+  const normalized = normalizeStepName(step);
+  const keyMap = {
+    'mobile verification': 'mobile_verification',
+    'email verification': 'email_verification',
+    'pan number verification': 'pan_and_dob',
+    'digilocker': 'digilocker_details',
+    'bank details': 'bank_details',
+    'personal details': 'personal_details',
+    'nominee details': 'nominee_details',
+    'live image': 'live_photo',
+    'signature upload': 'signature_upload',
+    'payment summary': 'payment_summary',
+    'esign': 'esign'
+  };
+  return keyMap[normalized] || normalized.replace(/\s+/g, '_');
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -128,7 +249,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Default columns for integration pages (hide current_stage, show specific reason)
     const intDefaults = [
       'application_date', 'client_code', 'client_name', 'pan_number', 'email_id', 'mobile_number',
-      'current_stage', intName, `${intName}_reason`, 'esign_pdf', 'action'
+      'current_stage', 'kyc_status', intName, `${intName}_reason`, 'esign_pdf'
     ];
     visibleColumns = [...intDefaults];
     columnOrder = [...intDefaults];
@@ -187,16 +308,11 @@ document.addEventListener('DOMContentLoaded', async () => {
   setupClientExportUI();
   
   const searchInput = document.getElementById('search-input');
+  bindClearToRefresh(searchInput, 'input');
   if (searchInput) {
-    searchInput.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') {
-        currentPage = 1;
-        saveClientListState();
-        loadClients();
-      }
-    });
-    searchInput.addEventListener('input', (e) => {
-      if (e.target.value.trim() === '') {
+    searchInput.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') {
+        event.preventDefault();
         currentPage = 1;
         saveClientListState();
         loadClients();
@@ -204,20 +320,46 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
-  const filtersToBind = [
-    document.getElementById('current-stage-filter'),
-    document.getElementById('status-filter'),
-    document.getElementById('from-date'),
-    document.getElementById('to-date')
-  ];
-  
-  if (!initialIntegration) {
-    filtersToBind.push(document.getElementById('integration-filter'));
+  const integrationFilter = document.getElementById('integration-filter');
+  bindClearToRefresh(integrationFilter, 'change');
+
+  const statusFilter = document.getElementById('status-filter');
+  if (statusFilter) {
+    statusFilter.addEventListener('change', () => {
+      currentPage = 1;
+      saveClientListState();
+      loadClients();
+    });
+    statusFilter.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        currentPage = 1;
+        saveClientListState();
+        loadClients();
+      }
+    });
   }
+
+  const stageFilter = document.getElementById('current-stage-filter');
+  bindChangeToRefresh(stageFilter);
+
+  const fromDate = document.getElementById('from-date');
+  const toDate = document.getElementById('to-date');
+  enableDatePickerPopup(fromDate);
+  enableDatePickerPopup(toDate);
   
-  filtersToBind.forEach(filter => {
-    if (filter) bindChangeToRefresh(filter);
-  });
+  const handleDateChange = () => {
+    const fDate = fromDate ? fromDate.value : '';
+    const tDate = toDate ? toDate.value : '';
+    if ((fDate && tDate) || (!fDate && !tDate)) {
+      currentPage = 1;
+      saveClientListState();
+      loadClients();
+    }
+  };
+  
+  if (fromDate) fromDate.addEventListener('change', handleDateChange);
+  if (toDate) toDate.addEventListener('change', handleDateChange);
   
   document.getElementById('prev-btn').addEventListener('click', () => {
     if (currentPage > 1) {
@@ -272,7 +414,7 @@ const setupCustomizeColumnsUI = () => {
       const intName = initialIntegration.toLowerCase();
       const intDefaults = [
         'application_date', 'client_code', 'client_name', 'pan_number', 'email_id', 'mobile_number',
-        'current_stage', 'kyc_status', intName, `${intName}_reason`, 'esign_pdf', 'action'
+        'current_stage', 'kyc_status', intName, `${intName}_reason`, 'esign_pdf'
       ];
       visibleColumns = [...intDefaults];
       columnOrder = [...intDefaults];
@@ -282,6 +424,14 @@ const setupCustomizeColumnsUI = () => {
     }
     currentSortBy = 'application_date';
     currentSortOrder = 'desc';
+    sidebarKycStatus = '';
+    sidebarKycStatusNavTriggered = false;
+    sessionStorage.removeItem('kyc_sidebar_status_nav');
+    if (window.history && window.history.replaceState) {
+      window.history.replaceState(null, '', window.location.pathname);
+    }
+
+    sessionStorage.removeItem(CLIENT_LIST_STATE_KEY);
     
     await saveUserPreferences();
     renderCustomizeList();
@@ -587,19 +737,6 @@ function appendCopyableValueCell(td, value, label, options = {}) {
   td.appendChild(wrapper);
 }
 
-function formatCurrentStage(currentStep) {
-  const step = String(currentStep || '')
-    .toLowerCase()
-    .replace(/\(.*?\)/g, '')
-    .trim();
-
-  const formattedStep = step
-    .replace(/[_-]+/g, ' ')
-    .replace(/\b\w/g, (char) => char.toUpperCase())
-    .trim();
-  return formattedStep || 'N/A';
-}
-
 function getClientExportValue(client, col) {
   switch (col) {
     case 'application_date':
@@ -843,14 +980,14 @@ const loadClients = async () => {
       sortOrder: currentSortOrder
     };
     
-    if (integrationFilter || statusFilter || fromDate || toDate || currentStageFilter) {
-      if (integrationFilter) params.integration = integrationFilter;
-      if (statusFilter) params.status = statusFilter;
-      if (currentStageFilter) params.currentStage = currentStageFilter;
-      if (fromDate) params.fromDate = fromDate;
-      if (toDate) params.toDate = toDate;
-    }
+    if (integrationFilter) params.integration = integrationFilter;
+    if (statusFilter) params.status = statusFilter;
+    if (currentStageFilter) params.currentStage = currentStageFilter;
     if (sidebarKycStatus) params.kyc_status = sidebarKycStatus;
+    if (fromDate && toDate) {
+      params.fromDate = fromDate;
+      params.toDate = toDate;
+    }
     
     const response = await window.api.getClients(params);
     const clients = response.data;
@@ -922,14 +1059,33 @@ const loadClients = async () => {
             td.innerHTML = `<a href="${href}" onclick="event.stopPropagation();" style="color:var(--primary-color); text-decoration:none; font-weight:500;">Check PDF</a>`; 
             break;
           case 'action':
-            td.style.position = 'relative';
+            td.onclick = (e) => e.stopPropagation();
             td.innerHTML = `
-              <div class="action-dropdown-container" onclick="event.stopPropagation();">
-                <button class="action-btn" onclick="toggleActionMenu('${client.application_id}', event)" style="background:transparent; border:none; font-size:1.2rem; cursor:pointer; color:var(--text-color);">⋮</button>
-                <div id="action-menu-${client.application_id}" class="action-menu" style="display:none; position:absolute; right:0; background:var(--surface-color); border:1px solid var(--border-color); border-radius:4px; box-shadow:0 2px 8px rgba(0,0,0,0.1); z-index:100; min-width:120px; flex-direction:column;">
-                  <button onclick="handleClientAction('${client.application_id}', 'delete')" style="padding:8px 12px; border:none; background:transparent; text-align:left; cursor:pointer; color:var(--rejected-color); width:100%; border-bottom:1px solid var(--border-color);">Delete</button>
-                  <button onclick="handleClientAction('${client.application_id}', 'skip_payment')" style="padding:8px 12px; border:none; background:transparent; text-align:left; cursor:pointer; color:var(--text-color); width:100%; border-bottom:1px solid var(--border-color);">Payment Skip</button>
-                  <button onclick="handleClientAction('${client.application_id}', 'step_back')" style="padding:8px 12px; border:none; background:transparent; text-align:left; cursor:pointer; color:var(--text-color); width:100%;">Step Back</button>
+              <div class="action-menu-wrapper" style="position:relative; display:inline-block;">
+                <button class="action-menu-btn" onclick="toggleActionMenu(event, '${client.application_id}')" 
+                  style="background:var(--surface-color); border:1px solid var(--border-color); color:var(--text-primary); 
+                  padding:6px 12px; border-radius:6px; cursor:pointer; font-size:0.9rem; display:flex; align-items:center; gap:6px;">
+                  ⚙ Actions
+                </button>
+                <div id="action-menu-${client.application_id}" class="action-dropdown" 
+                  style="display:none; position:absolute; right:0; top:110%; background:var(--surface-color); 
+                  border:1px solid var(--border-color); border-radius:8px; box-shadow:0 4px 16px rgba(0,0,0,0.3); 
+                  z-index:999; min-width:160px; overflow:hidden;">
+                  <button onclick="handleClientAction('delete','${client.application_id}','${(client.client_name||'Unknown').replace(/'/g,'\\&apos;')}', '', '${(client.client_code || '').replace(/'/g,'\\&apos;')}')" 
+                    style="display:block; width:100%; text-align:left; padding:10px 16px; background:transparent; 
+                    border:none; color:#F87171; cursor:pointer; font-size:0.9rem; border-bottom:1px solid var(--border-color);">
+                    🗑 Delete
+                  </button>
+                  <button onclick="handleClientAction('payment_skip','${client.application_id}','${(client.client_name||'Unknown').replace(/'/g,'\\&apos;')}', '', '${(client.client_code || '').replace(/'/g,'\\&apos;')}')" 
+                    style="display:block; width:100%; text-align:left; padding:10px 16px; background:transparent; 
+                    border:none; color:var(--text-primary); cursor:pointer; font-size:0.9rem; border-bottom:1px solid var(--border-color);">
+                    ⏭ Payment Skip
+                  </button>
+                  <button onclick="handleClientAction('step_back','${client.application_id}','${(client.client_name||'Unknown').replace(/'/g,'\\&apos;')}', decodeURIComponent('${encodeURIComponent(client.current_stage || '')}'), '${(client.client_code || '').replace(/'/g,'\\&apos;')}')" 
+                    style="display:block; width:100%; text-align:left; padding:10px 16px; background:transparent; 
+                    border:none; color:var(--text-primary); cursor:pointer; font-size:0.9rem;">
+                    ↩ Change Step
+                  </button>
                 </div>
               </div>
             `;
@@ -947,6 +1103,27 @@ const loadClients = async () => {
     console.error(error);
   }
 };
+function bindClearToRefresh(el, eventName = 'input') {
+  if (!el) return;
+
+  let lastValue = el.value;
+  const isEmpty = (value) => value == null || String(value).trim() === '';
+
+  const handleChange = () => {
+    const currentValue = el.value;
+    if (!isEmpty(lastValue) && isEmpty(currentValue)) {
+      currentPage = 1;
+      saveClientListState();
+      loadClients();
+    }
+    lastValue = currentValue;
+  };
+
+  el.addEventListener(eventName, handleChange);
+  if (eventName !== 'change') {
+    el.addEventListener('change', handleChange);
+  }
+}
 
 function bindChangeToRefresh(el) {
   if (!el) return;
@@ -962,72 +1139,310 @@ function bindChangeToRefresh(el) {
   });
 }
 
-window.toggleActionMenu = (appId, event) => {
-  event.stopPropagation();
-  const menus = document.querySelectorAll('.action-menu');
-  menus.forEach(m => {
-    if (m.id !== `action-menu-${appId}`) m.style.display = 'none';
+function enableDatePickerPopup(el) {
+  if (!el) return;
+  el.style.cursor = 'pointer';
+  el.addEventListener('click', () => {
+    if (typeof el.showPicker === 'function') {
+      try {
+        el.showPicker();
+      } catch (error) {
+        // Some browsers do not allow programmatic picker opening.
+      }
+    }
   });
-  
+}
+
+// --- Action Menu Logic ---
+window.toggleActionMenu = (e, appId) => {
+  e.stopPropagation();
+  document.querySelectorAll('.action-dropdown').forEach(menu => {
+    if (menu.id !== `action-menu-${appId}`) menu.style.display = 'none';
+  });
   const menu = document.getElementById(`action-menu-${appId}`);
-  if (menu) {
-    menu.style.display = menu.style.display === 'none' ? 'flex' : 'none';
-  }
+  if (menu) menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
 };
 
 document.addEventListener('click', () => {
-  const menus = document.querySelectorAll('.action-menu');
-  menus.forEach(m => m.style.display = 'none');
+  document.querySelectorAll('.action-dropdown').forEach(menu => { menu.style.display = 'none'; });
 });
 
-window.handleClientAction = async (appId, action) => {
+// --- Audit Log Helpers ---
+function getCurrentUser() {
+  try {
+    const u = JSON.parse(localStorage.getItem('kyc_user') || '{}');
+    return { name: u.full_name || u.username || 'Unknown', role: u.role || 'User' };
+  } catch(e) { return { name: 'Unknown', role: 'User' }; }
+}
+
+function storeAuditLog(type, data) {
+  const key = `kyc_audit_${type}`;
+  const logs = JSON.parse(localStorage.getItem(key) || '[]');
+  logs.unshift({ ...data, timestamp: new Date().toISOString() });
+  localStorage.setItem(key, JSON.stringify(logs));
+}
+
+function storeTrashRecord(appId, clientName, reason, deletedBy, userRole) {
+  const key = 'kyc_trash_records';
+  const records = JSON.parse(localStorage.getItem(key) || '[]');
+  records.unshift({
+    application_id: appId,
+    client_name: clientName,
+    deleted_by: deletedBy,
+    user_role: userRole,
+    deleted_at: new Date().toISOString(),
+    reason: reason,
+    purge_at: new Date(Date.now() + 10 * 24 * 60 * 60 * 1000).toISOString() // 10 days
+  });
+  localStorage.setItem(key, JSON.stringify(records));
+}
+
+async function sendClientActionRequest(candidates, payload) {
+  let lastResult = null;
+  for (const candidate of candidates) {
+    try {
+      const result = candidate.method === 'put'
+        ? await window.api.put(candidate.path, payload)
+        : await window.api.post(candidate.path, payload);
+      lastResult = result;
+      if (result && result.success) {
+        return result;
+      }
+    } catch (err) {
+      lastResult = { success: false, error: err.message };
+    }
+  }
+  return lastResult || { success: false, error: 'Unknown error' };
+}
+
+// --- Main Action Handler ---
+window.handleClientAction = (action, appId, clientName, currentStage, clientCode) => {
   const menu = document.getElementById(`action-menu-${appId}`);
   if (menu) menu.style.display = 'none';
-  
+
+  const user = getCurrentUser();
+
   if (action === 'delete') {
-    if (confirm('Are you sure you want to delete this client record?')) {
-      try {
-        const res = await window.api.delete(`/kyc-applications/${appId}`);
-        if (res.success) {
-          alert('Client record deleted successfully.');
-          loadClients();
-        } else {
-          alert('Failed to delete: ' + res.message);
-        }
-      } catch (err) {
-        alert('An error occurred.');
-        console.error(err);
+    window.showActionModal({
+      title: '🗑 Delete Client Record',
+      infoHtml: `
+        <p style="margin:0 0 6px; font-size:0.88rem; color:var(--text-muted);">You are about to soft-delete:</p>
+        <p style="margin:0; font-weight:600;">${clientName}</p>
+        <p style="margin:4px 0 0; font-size:0.82rem; color:var(--text-muted);">Application ID: ${appId}</p>
+        <p style="margin:6px 0 0; font-size:0.82rem; color:#F87171;">⚠ Record will be moved to Trash and permanently deleted after 10 days.</p>`,
+      confirmBtnText: 'Delete Record',
+      confirmBtnColor: '#dc3545',
+      onConfirm: async (remarks) => {
+        try {
+          const result = await window.api.delete(`/kyc-applications/${appId}`);
+          if (result && result.success) {
+            storeTrashRecord(appId, clientName, remarks, user.name, user.role);
+            storeAuditLog('delete', {
+              application_id: appId, client_name: clientName,
+              deleted_by: user.name, user_role: user.role, reason: remarks
+            });
+            alert('✅ Client record deleted. Moved to Trash.');
+            loadClients();
+          } else {
+            alert('❌ Delete failed: ' + (result && (result.error || result.message) ? (result.error || result.message) : 'Unknown error'));
+          }
+        } catch(err) { alert('❌ Error: ' + err.message); }
       }
-    }
-  } else if (action === 'skip_payment') {
-    if (confirm('Are you sure you want to skip payment for this client?')) {
-      try {
-        const res = await window.api.post(`/kyc-applications/${appId}/skip-payment`, {});
-        if (res.success) {
-          alert('Payment skipped successfully.');
-          loadClients();
-        } else {
-          alert('Failed to skip payment: ' + res.message);
-        }
-      } catch (err) {
-        alert('An error occurred.');
-        console.error(err);
+    });
+
+  } else if (action === 'payment_skip') {
+    window.showActionModal({
+      title: '⏭ Skip Payment Step',
+      infoHtml: `
+        <p style="margin:0 0 6px; font-size:0.88rem; color:var(--text-muted);">Skipping payment for:</p>
+        <p style="margin:0; font-weight:600;">${clientName}</p>
+        <p style="margin:4px 0 0; font-size:0.82rem; color:var(--text-muted);">Application ID: ${appId}</p>
+        <p style="margin:6px 0 0; font-size:0.82rem; color:#f59e0b;">This will advance the client to the next stage.</p>`,
+      confirmBtnText: 'Skip Payment',
+      confirmBtnColor: '#f59e0b',
+      onConfirm: async (remarks) => {
+        try {
+          const payload = {
+            remarks,
+            skipped_by: user.name,
+            user_role: user.role,
+            action_type: 'payment_skip',
+            application_id: appId,
+            client_code: clientCode || undefined
+          };
+          const paymentCandidates = [];
+          if (clientCode) {
+            paymentCandidates.push({ method: 'post', path: `/clients/${encodeURIComponent(clientCode)}/skip-payment` });
+            paymentCandidates.push({ method: 'put', path: `/clients/${encodeURIComponent(clientCode)}/skip-payment` });
+          }
+          paymentCandidates.push({ method: 'post', path: `/kyc-applications/${appId}/skip-payment` });
+          paymentCandidates.push({ method: 'put', path: `/kyc-applications/${appId}/skip-payment` });
+          paymentCandidates.push({ method: 'post', path: `/kyc-applications/${appId}/stages` });
+          paymentCandidates.push({ method: 'put', path: `/kyc-applications/${appId}/stages` });
+
+          const result = await sendClientActionRequest(paymentCandidates, payload);
+          if (result && result.success) {
+            storeAuditLog('payment_skip', {
+              application_id: appId, client_name: clientName,
+              skipped_by: user.name, user_role: user.role,
+              skip_reason: remarks, payment_status_before: 'pending'
+            });
+            alert('✅ Payment step skipped. Client moved to next stage.');
+            loadClients();
+          } else {
+            alert('❌ Payment skip failed: ' + (result && (result.error || result.message) ? (result.error || result.message) : 'Unknown error'));
+          }
+        } catch(err) { alert('❌ Error: ' + err.message); }
       }
-    }
+    });
+
   } else if (action === 'step_back') {
-    if (confirm('Are you sure you want to move this client back to the previous stage?')) {
-      try {
-        const res = await window.api.post(`/kyc-applications/${appId}/step-back`, {});
-        if (res.success) {
-          alert('Client stage moved back successfully.');
-          loadClients();
-        } else {
-          alert('Failed to step back: ' + res.message);
-        }
-      } catch (err) {
-        alert('An error occurred.');
-        console.error(err);
+    const existingStep = getFriendlyStepName(currentStage || 'Not Started');
+    const existingStepIndex = getStepIndex(currentStage || 'Not Started');
+    const defaultDirection = getDefaultMoveDirection(existingStep);
+    window.showActionModal({
+      title: 'Change Client Step',
+      infoHtml: `
+        <p style="margin:0 0 6px; font-size:0.88rem; color:var(--text-muted);">Update the KYC journey for:</p>
+        <p style="margin:0; font-weight:600;">${clientName}</p>
+        <p style="margin:4px 0 0; font-size:0.82rem; color:var(--text-muted);">Application ID: ${appId}</p>`,
+      extraFieldsHtml: `
+        <div style="display:flex; flex-direction:column; gap:14px;">
+          <div style="padding:12px; border:1px solid var(--border-color); border-radius:8px; background:rgba(255,255,255,0.04);">
+            <div style="font-size:0.82rem; color:var(--text-muted); margin-bottom:4px;">Current Step</div>
+            <div id="arm-current-step-value" style="font-weight:600; color:var(--text-primary);">${existingStep}</div>
+          </div>
+          <div>
+            <label for="arm-step-direction" style="display:block; margin-bottom:8px; font-weight:500; color:var(--text-primary);">Move Direction</label>
+            <select id="arm-step-direction" style="width:100%; padding:10px; border-radius:8px; border:1px solid var(--border-color); background:var(--bg-color); color:var(--text-primary);">
+              <option value="previous" ${defaultDirection === 'previous' ? 'selected' : ''}>Previous Step</option>
+              <option value="next" ${defaultDirection === 'next' ? 'selected' : ''}>Next Step</option>
+            </select>
+          </div>
+          <div>
+            <label for="arm-selected-step" style="display:block; margin-bottom:8px; font-weight:500; color:var(--text-primary);">Select Step</label>
+            <select id="arm-selected-step" style="width:100%; padding:10px; border-radius:8px; border:1px solid var(--border-color); background:var(--bg-color); color:var(--text-primary);"></select>
+            <p id="arm-step-hint" style="margin:6px 0 0; color:var(--text-muted); font-size:0.8rem;">Only valid steps for the selected direction are enabled.</p>
+          </div>
+        </div>`,
+      confirmBtnText: 'Change Step',
+      confirmBtnColor: '#6366f1',
+      onOpen: () => {
+        const directionEl = document.getElementById('arm-step-direction');
+        const stepSelectEl = document.getElementById('arm-selected-step');
+        const hintEl = document.getElementById('arm-step-hint');
+
+        if (!directionEl || !stepSelectEl) return;
+
+        const syncSteps = () => {
+          const direction = directionEl.value;
+          const optionsHtml = buildStepOptions(existingStep, direction);
+          stepSelectEl.innerHTML = optionsHtml;
+
+          const enabledOptions = Array.from(stepSelectEl.options).filter(option => !option.disabled);
+          if (existingStepIndex < 0) {
+            stepSelectEl.disabled = false;
+            if (hintEl) {
+              hintEl.textContent = 'Current stage could not be mapped, so all steps are available.';
+            }
+            if (enabledOptions.length > 0) {
+              stepSelectEl.value = enabledOptions[0].value;
+            }
+            return;
+          }
+
+          if (enabledOptions.length === 0) {
+            stepSelectEl.disabled = true;
+            if (hintEl) {
+              hintEl.textContent = 'No valid steps are available for this direction.';
+            }
+            return;
+          }
+
+          stepSelectEl.disabled = false;
+          stepSelectEl.value = enabledOptions[0].value;
+          if (hintEl) {
+            hintEl.textContent = direction === 'previous'
+              ? 'Future steps are disabled when moving to a previous step.'
+              : 'Earlier steps are disabled when moving to a next step.';
+          }
+        };
+
+        directionEl.addEventListener('change', syncSteps);
+        syncSteps();
+      },
+      onConfirm: async (remarks, extraData) => {
+        try {
+          const moveDirection = extraData['arm-step-direction'] || defaultDirection;
+          const selectedStep = extraData['arm-selected-step'] || existingStep;
+          const currentStepKey = getBackendStepKey(existingStep);
+          const selectedStepKey = getBackendStepKey(selectedStep);
+          const previousStepKey = moveDirection === 'previous' ? selectedStepKey : currentStepKey;
+          const newStepKey = moveDirection === 'previous' ? selectedStepKey : selectedStepKey;
+          const actionEndpoint = moveDirection === 'previous' ? 'step-back' : 'skip-payment';
+          const payload = {
+            remarks,
+            client_id: appId,
+            application_id: appId,
+            client_code: clientCode || undefined,
+            current_step: existingStep,
+            current_stage: existingStep,
+            current_step_key: currentStepKey,
+            current_stage_key: currentStepKey,
+            move_direction: moveDirection,
+            selected_step: selectedStep,
+            selected_stage: selectedStep,
+            selected_step_key: selectedStepKey,
+            selected_stage_key: selectedStepKey,
+            previous_step: moveDirection === 'previous' ? selectedStep : existingStep,
+            previous_stage: moveDirection === 'previous' ? selectedStep : existingStep,
+            previous_step_key: previousStepKey,
+            previous_stage_key: previousStepKey,
+            new_step: selectedStep,
+            new_stage: selectedStep,
+            new_step_key: newStepKey,
+            new_stage_key: newStepKey,
+            action_type: 'change_client_step',
+            moved_by: user.name,
+            user_name: user.name,
+            user_role: user.role
+          };
+
+          const stepCandidates = [];
+          if (clientCode) {
+            stepCandidates.push({ method: 'post', path: `/clients/${encodeURIComponent(clientCode)}/${actionEndpoint}` });
+            stepCandidates.push({ method: 'put', path: `/clients/${encodeURIComponent(clientCode)}/${actionEndpoint}` });
+          }
+          stepCandidates.push({ method: 'post', path: `/kyc-applications/${appId}/${actionEndpoint}` });
+          stepCandidates.push({ method: 'put', path: `/kyc-applications/${appId}/${actionEndpoint}` });
+          stepCandidates.push({ method: 'post', path: `/kyc-applications/${appId}/stages` });
+          stepCandidates.push({ method: 'put', path: `/kyc-applications/${appId}/stages` });
+
+          const result = await sendClientActionRequest(stepCandidates, payload);
+          if (result && result.success) {
+            storeAuditLog(moveDirection === 'previous' ? 'step_back' : 'payment_skip', {
+              client_id: appId,
+              application_id: appId,
+              client_name: clientName,
+              action_type: 'change_client_step',
+              move_direction: moveDirection,
+              previous_step: existingStep,
+              previous_stage: existingStep,
+              selected_step: selectedStep,
+              new_stage: result.new_stage || result.selected_step || selectedStep,
+              reason: remarks,
+              remarks,
+              moved_by: user.name,
+              user_name: user.name,
+              user_role: user.role
+            });
+            alert(`✅ Client stage updated to ${result.new_stage || result.selected_step || selectedStep}.`);
+            loadClients();
+          } else {
+            alert('❌ Step change failed: ' + (result && (result.error || result.message) ? (result.error || result.message) : 'Unknown error'));
+          }
+        } catch(err) { alert('❌ Error: ' + err.message); }
       }
-    }
+    });
   }
 };

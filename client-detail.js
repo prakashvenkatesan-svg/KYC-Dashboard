@@ -66,6 +66,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // 3. Extract and Render Documents
     renderDocuments(data.stages);
+    
+    // Inject timestamps asynchronously
+    fetchAndInjectStageTimestamps(clientCodeStr);
 
   } catch (error) {
     console.error(error);
@@ -189,6 +192,61 @@ function renderModules(stages) {
   container.innerHTML = html;
 }
 
+async function fetchAndInjectStageTimestamps(clientCode) {
+  try {
+    if (!window.api || !window.api.get) return;
+    const res = await window.api.get(`/clients/${clientCode}/stage-timestamps`);
+    if (res && res.success && Array.isArray(res.data)) {
+      const stageMap = {};
+      // Map the backend stage codes/names to frontend accordion labels
+      res.data.forEach(log => {
+        // Find matching frontend key
+        const labelStr = (log.stage_name || '').replace(/_/g, ' ').toLowerCase();
+        let displayLabel = null;
+        if (labelStr.includes('mobile')) displayLabel = 'Mobile';
+        else if (labelStr.includes('email')) displayLabel = 'Email';
+        else if (labelStr.includes('pan')) displayLabel = 'Pan';
+        else if (labelStr.includes('digilocker')) displayLabel = 'Digilocker';
+        else if (labelStr.includes('personal')) displayLabel = 'Personal details';
+        else if (labelStr.includes('bank')) displayLabel = 'Bank';
+        else if (labelStr.includes('nominee')) displayLabel = 'Nominee';
+        else if (labelStr.includes('photo') || labelStr.includes('image')) displayLabel = 'Liveimage';
+        else if (labelStr.includes('sign') && !labelStr.includes('esign')) displayLabel = 'Sign upload';
+        else if (labelStr.includes('scheme') || labelStr.includes('plan')) displayLabel = 'Payment plan';
+        else if (labelStr.includes('payment')) displayLabel = 'payment_gateway';
+        else if (labelStr.includes('esign')) displayLabel = 'Esign';
+        
+        if (displayLabel) {
+           stageMap[displayLabel] = log;
+        }
+      });
+
+      // Inject into DOM
+      const headers = document.querySelectorAll('.accordion-header span:first-child');
+      headers.forEach(header => {
+        const title = header.textContent.trim();
+        const log = stageMap[title];
+        if (log) {
+           let timeStr = '';
+           if (log.completed_at) {
+             const dt = new Date(log.completed_at);
+             timeStr = `(Completed: ${dt.toLocaleDateString()} ${dt.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})})`;
+           } else if (log.entered_at) {
+             const dt = new Date(log.entered_at);
+             timeStr = `(Entered: ${dt.toLocaleDateString()} ${dt.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})})`;
+           }
+           
+           if (timeStr) {
+             header.innerHTML = `${title} <span style="font-size: 0.75rem; color: var(--text-muted); margin-left: 8px;">${timeStr}</span>`;
+           }
+        }
+      });
+    }
+  } catch (error) {
+    console.warn("Could not fetch stage timestamps:", error);
+  }
+}
+
 const blacklist = ['id', 'application_id', 'otp_hash', 'expires_at', 'attempts', 'is_used', 'created_at', 'updated_at', 'request_payload', 'response_payload', 'session_id', 'verification_id', 'metadata', 'raw_response', 'email_otp_hash', 'terms_accepted', 'payment_status_code'];
 
 function renderStageDataRecursive(data) {
@@ -211,7 +269,7 @@ function renderStageDataRecursive(data) {
     return html;
   }
 
-  const editIcon = `<svg style="position:absolute; right:12px; top:12px; cursor:pointer;" onclick="alert('Edit functionality coming soon!')" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#475569" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>`;
+  const editIcon = `<svg style="position:absolute; right:12px; top:12px; cursor:pointer;" onclick="window.handleEditField(this, '${k}', '${dKey}', \`${String(v).replace(/`/g, '\\`')}\`)" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#475569" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>`;
 
   let html = `<div style="display:flex; flex-direction:column; gap:8px;">`;
   for (const [k, v] of Object.entries(data)) {
@@ -238,6 +296,23 @@ function renderStageDataRecursive(data) {
   html += `</div>`;
   return html;
 }
+
+window.handleEditField = async (iconEl, fieldId, fieldName, currentVal) => {
+  const newVal = prompt(`Edit ${fieldName}:`, currentVal);
+  if (newVal !== null && newVal !== currentVal) {
+    const valContainer = iconEl.previousElementSibling;
+    valContainer.textContent = newVal;
+    try {
+       const urlParams = new URLSearchParams(window.location.search);
+       const clientCode = urlParams.get('code');
+       if (window.api && window.api.put && clientCode) {
+         await window.api.put(`/clients/${clientCode}`, { [fieldId]: newVal });
+       }
+    } catch(e) {
+       console.warn('Update API fallback:', e);
+    }
+  }
+};
 
 function renderDocuments(stages) {
   const container = document.getElementById('documents-list');

@@ -56,11 +56,11 @@
             <option value="eSign">eSign</option>
           </select>
           
-          <input type="date" id="from-date" onclick="this.showPicker()" style="padding: 8px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-color);" title="From Date">
-          <input type="date" id="to-date" onclick="this.showPicker()" style="padding: 8px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-color);" title="To Date">
+          <input type="date" id="from-date" style="padding: 8px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-color);" title="From Date">
+          <input type="date" id="to-date" style="padding: 8px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-color);" title="To Date">
           
           <div style="display: flex; gap: 8px; align-items: center; position: relative;">
-            <button id="customize-cols-btn" style="border: 1px solid var(--border-color); background: var(--primary-color); color: white; border-radius: 6px; padding: 8px 16px; cursor: pointer; font-weight: 500; display: flex; align-items: center; gap: 6px;">Columns ⚙</button>
+            <button id="customize-cols-btn" style="border: 1px solid var(--border-color); background: var(--surface-color); color: var(--text-primary); border-radius: 6px; padding: 8px 16px; cursor: pointer; font-weight: 500; display: flex; align-items: center; gap: 6px;">Columns ⚙</button>
             <button id="export-clients-btn" style="border: 1px solid var(--border-color); background: var(--primary-color); color: white; border-radius: 6px; padding: 8px 16px; cursor: pointer; font-weight: 500; display: flex; align-items: center; gap: 6px;">Export ⭳</button>
 
             <div id="export-clients-menu" style="position: absolute; top: 100%; left: 0; margin-top: 8px; background: var(--surface-color); border: 1px solid var(--border-color); border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.2); width: 180px; z-index: 120; padding: 8px; flex-direction: column; gap: 6px; display: none;">
@@ -110,7 +110,6 @@
             <th class="col-techexcel">TECHEXCEL</th>
             <th class="col-techexcel-reason" style="display:none;">TECHEXCEL REJECTION REASON</th>
             <th class="col-esign">ESIGN PDF</th>
-            <th class="col-action">ACTION/EDIT</th>
           </tr>
             </thead>
             <tbody id="clients-tbody">
@@ -150,6 +149,7 @@
 
   <script src="api.js"></script>
   <script src="sidebar.js"></script>
+  <script src="action-modals.js"></script>
   <script src="clients.js"></script>
 </body>
 </html>

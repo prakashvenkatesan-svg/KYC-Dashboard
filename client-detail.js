@@ -269,8 +269,6 @@ function renderStageDataRecursive(data) {
     return html;
   }
 
-  const editIcon = `<svg style="position:absolute; right:12px; top:12px; cursor:pointer;" onclick="window.handleEditField(this, '${k}', '${dKey}', \`${String(v).replace(/`/g, '\\`')}\`)" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#475569" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>`;
-
   let html = `<div style="display:flex; flex-direction:column; gap:8px;">`;
   for (const [k, v] of Object.entries(data)) {
      if (blacklist.includes(k.toLowerCase())) continue;
@@ -285,6 +283,7 @@ function renderStageDataRecursive(data) {
             finalVal = `<a href="${v}" target="_blank" style="color:var(--primary-color); text-decoration:underline;">View Link</a>`;
          }
          
+         const editIcon = `<svg style="position:absolute; right:12px; top:12px; cursor:pointer;" onclick="window.handleEditField(this, '${k}', '${dKey}', \\\`${String(v).replace(/`/g, '\\\\`')}\\\`)" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#475569" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>`;
          html += `
          <div style="background-color:#f1f3f5; border:1px solid #e2e8f0; border-radius:6px; padding:10px 12px; position:relative;">
            <div style="color:#64748b; font-size:0.75rem; margin-bottom:2px; text-transform:capitalize;">${dKey}</div>

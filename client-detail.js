@@ -230,14 +230,41 @@ async function fetchAndInjectStageTimestamps(clientCode) {
            let timeStr = '';
            if (log.completed_at) {
              const dt = new Date(log.completed_at);
-             timeStr = `(Completed: ${dt.toLocaleDateString()} ${dt.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})})`;
+             timeStr = `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')} ${dt.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', second:'2-digit', hour12: false})}`;
            } else if (log.entered_at) {
              const dt = new Date(log.entered_at);
-             timeStr = `(Entered: ${dt.toLocaleDateString()} ${dt.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})})`;
+             timeStr = `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')} ${dt.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', second:'2-digit', hour12: false})}`;
            }
            
            if (timeStr) {
-             header.innerHTML = `${title} <span style="font-size: 0.75rem; color: var(--text-muted); margin-left: 8px;">${timeStr}</span>`;
+             const accordionContent = header.closest('.accordion-header').nextElementSibling;
+             if (accordionContent) {
+               // Remove any "No data available" if it exists
+               const noData = accordionContent.querySelector('p');
+               if (noData && noData.textContent === 'No data available') {
+                 noData.remove();
+                 // If the content was completely empty, we might need to add the flex column gap container
+                 if (!accordionContent.querySelector('div[style*="flex-direction:column"]')) {
+                   accordionContent.innerHTML = `<div style="display:flex; flex-direction:column; gap:8px;"></div>`;
+                 }
+               }
+               
+               let flexContainer = accordionContent.querySelector('div[style*="flex-direction:column"]');
+               if (!flexContainer) {
+                 // wrap existing content
+                 const existingHTML = accordionContent.innerHTML;
+                 accordionContent.innerHTML = `<div style="display:flex; flex-direction:column; gap:8px;">${existingHTML}</div>`;
+                 flexContainer = accordionContent.querySelector('div[style*="flex-direction:column"]');
+               }
+
+               const timestampHtml = `
+               <div style="background-color:#f1f3f5; border:1px solid #e2e8f0; border-radius:6px; padding:10px 12px; position:relative;">
+                 <div style="color:#64748b; font-size:0.75rem; margin-bottom:2px; text-transform:capitalize;">Stage Timestamp</div>
+                 <div style="font-weight:600; font-size:0.95rem; color:#1e293b; word-break:break-all;">${timeStr}</div>
+               </div>`;
+               
+               flexContainer.insertAdjacentHTML('afterbegin', timestampHtml);
+             }
            }
         }
       });

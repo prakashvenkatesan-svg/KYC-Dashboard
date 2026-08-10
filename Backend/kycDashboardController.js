@@ -582,11 +582,11 @@ const getPayments = async (req, res) => {
 };
 
 const editClientField = async (req, res) => {
-  const { applicationId } = req.params;
+  const { clientCode } = req.params;
   const { stage_key, field_key, new_value } = req.body;
 
-  if (!applicationId || !stage_key || !field_key) {
-    return res.status(400).json({ success: false, message: "applicationId, stage_key, and field_key are required" });
+  if (!clientCode || !stage_key || !field_key) {
+    return res.status(400).json({ success: false, message: "clientCode, stage_key, and field_key are required" });
   }
 
   // Determine target table based on stage
@@ -627,6 +627,22 @@ const editClientField = async (req, res) => {
   try {
     await client.query('BEGIN');
     
+    // Lookup applicationId from clientCode
+    const appQuery = await client.query(
+      `SELECT ka.id FROM public.kyc_applications ka 
+       LEFT JOIN public.contact_details cd ON cd.application_id = ka.id
+       LEFT JOIN public.client_codes cc ON cc.email = cd.email
+       WHERE COALESCE(cc.client_code, ka.client_code) = $1 
+       ORDER BY ka.id DESC LIMIT 1`,
+      [clientCode]
+    );
+
+    if (appQuery.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ success: false, message: "Client not found" });
+    }
+    const applicationId = appQuery.rows[0].id;
+
     // Check if a row exists for this application
     const checkRes = await client.query(`SELECT 1 FROM public.${targetTable} WHERE application_id = $1`, [applicationId]);
     if (checkRes.rowCount === 0) {

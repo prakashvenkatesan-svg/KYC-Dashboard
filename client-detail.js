@@ -183,7 +183,7 @@ function renderModules(stages) {
     if (!stageData || (Array.isArray(stageData) && stageData.length === 0)) {
       html += `<p style="color:var(--text-secondary); margin:0;">No data available</p>`;
     } else {
-      html += renderStageDataRecursive(stageData);
+      html += renderStageDataRecursive(stageData, def.key);
     }
     
     html += `</div></div>`;
@@ -249,7 +249,7 @@ async function fetchAndInjectStageTimestamps(clientCode) {
 
 const blacklist = ['id', 'application_id', 'otp_hash', 'expires_at', 'attempts', 'is_used', 'created_at', 'updated_at', 'request_payload', 'response_payload', 'session_id', 'verification_id', 'metadata', 'raw_response', 'email_otp_hash', 'terms_accepted', 'payment_status_code'];
 
-function renderStageDataRecursive(data) {
+function renderStageDataRecursive(data, stageKey = '') {
   if (data === null || data === undefined) return '<span style="color:var(--text-muted);">N/A</span>';
   if (typeof data !== 'object') {
      if (typeof data === 'string' && data.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/)) {
@@ -263,7 +263,7 @@ function renderStageDataRecursive(data) {
     data.forEach((item, idx) => {
       html += `<div style="margin-bottom:8px; padding-bottom:8px; border-bottom:1px dashed var(--border-color);">
                  <strong style="display:block; margin-bottom:4px;">Item ${idx + 1}</strong>
-                 ${renderStageDataRecursive(item)}
+                 ${renderStageDataRecursive(item, stageKey)}
                </div>`;
     });
     return html;
@@ -275,15 +275,15 @@ function renderStageDataRecursive(data) {
      const dKey = k.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
      
      if (typeof v === 'object' && v !== null && !Array.isArray(v)) {
-         html += `<div style="margin-top: 8px;"><strong>${dKey}</strong><div style="padding-left: 8px; border-left: 2px solid var(--border-color); margin-top: 4px;">${renderStageDataRecursive(v)}</div></div>`;
+         html += `<div style="margin-top: 8px;"><strong>${dKey}</strong><div style="padding-left: 8px; border-left: 2px solid var(--border-color); margin-top: 4px;">${renderStageDataRecursive(v, stageKey)}</div></div>`;
      } else {
-         const dVal = (v === null || v === '') ? 'N/A' : renderStageDataRecursive(v);
+         const dVal = (v === null || v === '') ? 'N/A' : renderStageDataRecursive(v, stageKey);
          let finalVal = dVal;
          if (typeof v === 'string' && (v.startsWith('http://') || v.startsWith('https://'))) {
             finalVal = `<a href="${v}" target="_blank" style="color:var(--primary-color); text-decoration:underline;">View Link</a>`;
          }
          
-         const editIcon = `<svg style="position:absolute; right:12px; top:12px; cursor:pointer;" onclick="window.handleEditField(this, '${k}', '${dKey}', \\\`${String(v).replace(/`/g, '\\\\`')}\\\`)" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#475569" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>`;
+         const editIcon = `<svg style="position:absolute; right:12px; top:12px; cursor:pointer;" onclick="window.handleEditField(this, '${stageKey}', '${k}', '${dKey}', \\\`${String(v).replace(/`/g, '\\\\`')}\\\`)" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#475569" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>`;
          html += `
          <div style="background-color:#f1f3f5; border:1px solid #e2e8f0; border-radius:6px; padding:10px 12px; position:relative;">
            <div style="color:#64748b; font-size:0.75rem; margin-bottom:2px; text-transform:capitalize;">${dKey}</div>
@@ -296,19 +296,29 @@ function renderStageDataRecursive(data) {
   return html;
 }
 
-window.handleEditField = async (iconEl, fieldId, fieldName, currentVal) => {
+window.handleEditField = async (iconEl, stageKey, fieldId, fieldName, currentVal) => {
   const newVal = prompt(`Edit ${fieldName}:`, currentVal);
   if (newVal !== null && newVal !== currentVal) {
     const valContainer = iconEl.previousElementSibling;
+    const oldVal = valContainer.textContent;
     valContainer.textContent = newVal;
     try {
        const urlParams = new URLSearchParams(window.location.search);
        const clientCode = urlParams.get('code');
        if (window.api && window.api.put && clientCode) {
-         await window.api.put(`/clients/${clientCode}`, { [fieldId]: newVal });
+         const response = await window.api.put(`/clients/${clientCode}/edit-field`, { stage_key: stageKey, field_key: fieldId, new_value: newVal });
+         if (!response.success) {
+           console.warn('Edit failed on backend, reverting.');
+           valContainer.textContent = oldVal;
+           alert(response.message || "Failed to update field.");
+         } else {
+           alert("Field updated successfully!");
+         }
        }
     } catch(e) {
        console.warn('Update API fallback:', e);
+       valContainer.textContent = oldVal;
+       alert("Failed to update field due to server error.");
     }
   }
 };

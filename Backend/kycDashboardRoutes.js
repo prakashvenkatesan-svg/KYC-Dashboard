@@ -7,7 +7,9 @@ const {
   getClientKycStages,
   getIntegrationRecords,
   getPayments,
-  getStageTimestamps
+  getPayments,
+  getStageTimestamps,
+  editClientField
 } = require("./kycDashboardController");
 
 const { 
@@ -53,6 +55,8 @@ router.get("/kyc-applications/:applicationId/details", verifyTokenMiddleware, ge
 router.get("/kyc-applications/:applicationId/stages", verifyTokenMiddleware, getClientKycStages);
 router.get("/integrations/:integrationName", verifyTokenMiddleware, getIntegrationRecords);
 router.get("/payments", verifyTokenMiddleware, getPayments);
+
+router.put("/clients/:clientCode/edit-field", verifyTokenMiddleware, requireAdminMiddleware, editClientField);
 
 router.post("/clients/:clientCode/skip-payment", verifyTokenMiddleware, requireAdminMiddleware, skipPaymentAction);
 router.put("/clients/:clientCode/skip-payment", verifyTokenMiddleware, requireAdminMiddleware, skipPaymentAction);

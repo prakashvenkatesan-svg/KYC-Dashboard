@@ -712,6 +712,43 @@ const getStageTimestamps = async (req, res) => {
       console.warn("Table stage_lifecycle_timestamps might not exist yet.", e.message);
     }
 
+    // --- FALLBACK LOGIC FOR EXISTING RECORDS ---
+    // If the record was processed before the trigger was added, pull timestamps from individual tables.
+    const fallbackTables = [
+      { stage_name: 'mobile_verification', table: 'contact_details' },
+      { stage_name: 'email_verification', table: 'contact_details' },
+      { stage_name: 'pan_and_dob', table: 'identity_verifications' },
+      { stage_name: 'digilocker_details', table: 'digilocker_details' },
+      { stage_name: 'personal_details', table: 'personal_details' },
+      { stage_name: 'bank_details', table: 'bank_details' },
+      { stage_name: 'nominee_details', table: 'nominee_details' },
+      { stage_name: 'live_photo', table: 'applicant_photo_uploads' },
+      { stage_name: 'signature_upload', table: 'signature_uploads' },
+      { stage_name: 'scheme_details', table: 'payments_details' },
+      { stage_name: 'esign', table: 'esign_audit_logs' }
+    ];
+
+    const existingStages = new Set(lifecycleData.map(l => l.stage_name));
+
+    for (const fb of fallbackTables) {
+      if (!existingStages.has(fb.stage_name)) {
+        try {
+          const res = await pool.query(`SELECT created_at, updated_at FROM public.${fb.table} WHERE application_id = $1 LIMIT 1`, [applicationId]);
+          if (res.rows.length > 0) {
+             const row = res.rows[0];
+             lifecycleData.push({
+               stage_name: fb.stage_name,
+               entered_at: row.created_at || row.updated_at,
+               completed_at: row.updated_at || row.created_at,
+               duration_seconds: null
+             });
+          }
+        } catch (e) {
+          // Table or column might not exist for some, just ignore silently
+        }
+      }
+    }
+
     return res.status(200).json({
       success: true,
       data: lifecycleData

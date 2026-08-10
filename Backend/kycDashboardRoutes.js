@@ -7,7 +7,6 @@ const {
   getClientKycStages,
   getIntegrationRecords,
   getPayments,
-  getPayments,
   getStageTimestamps,
   editClientField
 } = require("./kycDashboardController");

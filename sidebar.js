@@ -42,7 +42,7 @@ const sidebarHTML = `
       <a href="dashboard.html" class="nav-link" id="nav-dashboard">
         <i class="icon">&#128202;</i> Dashboard
       </a>
-      <a href="/clients.html" class="nav-link" id="nav-clients">
+      <a href="clients.html" class="nav-link" id="nav-clients">
         <i class="icon">&#128101;</i> Clients
       </a>
       <a href="payments.html" class="nav-link" id="nav-payments">
@@ -85,7 +85,7 @@ const sidebarHTML = `
           </a>
         </div>
       </div>
-      <a href="/trash.html" class="nav-link" id="nav-trash">
+      <a href="trash.html" class="nav-link" id="nav-trash">
         <i class="icon" style="font-style:normal;">&#128465;</i> Trash
       </a>
     </nav>

@@ -9,7 +9,7 @@ const {
   getClientKycFullDetailsQuery,
   getPaymentsListBaseQuery
 } = require("./kycDashboardQueries"); // assuming it's in the same folder
-const { generateGenericPresignedUrl } = require("./s3Service");
+const { generateGenericPresignedUrl, generatePresignedPdfUrl } = require("./s3Service");
 
 const normalizeStatus = (status) => {
   if (!status) return 'Pending'; // Default if null
@@ -296,6 +296,18 @@ const getClientByCode = async (req, res) => {
       });
     }
 
+    // Attach dynamically generated signed PDF URL if it exists
+    const pan = payload.pan_number || payload.application?.pan_number;
+    if (pan) {
+      const pdfData = await generatePresignedPdfUrl(pan);
+      if (pdfData && pdfData.signedPdfUrl) {
+        if (!payload.stages) payload.stages = {};
+        if (!payload.stages.esign) payload.stages.esign = {};
+        if (!payload.stages.esign.audit_log) payload.stages.esign.audit_log = {};
+        payload.stages.esign.audit_log.document_url = pdfData.signedPdfUrl;
+      }
+    }
+
     applyClientDetailMasking(payload, req.user && req.user.role === 'Admin');
 
     // Normalize statuses
@@ -361,6 +373,18 @@ const getClientById = async (req, res) => {
 
     // Convert all /uploads/ paths to AWS S3 Presigned URLs recursively!
     await convertPathsToPresignedUrls(payload.stages);
+
+    // Attach dynamically generated signed PDF URL if it exists
+    const pan = payload.pan_number || payload.application?.pan_number;
+    if (pan) {
+      const pdfData = await generatePresignedPdfUrl(pan);
+      if (pdfData && pdfData.signedPdfUrl) {
+        if (!payload.stages) payload.stages = {};
+        if (!payload.stages.esign) payload.stages.esign = {};
+        if (!payload.stages.esign.audit_log) payload.stages.esign.audit_log = {};
+        payload.stages.esign.audit_log.document_url = pdfData.signedPdfUrl;
+      }
+    }
 
     // Create integrations object
     payload.integrations = {

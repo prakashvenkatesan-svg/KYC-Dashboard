@@ -46,6 +46,58 @@ const formatCurrentStage = (currentStep) => {
   return formattedStep || 'N/A';
 };
 
+const CopyField = ({ value, label }) => {
+  const [copied, setCopied] = useState(false);
+
+  if (!value || value === 'N/A' || String(value).trim() === '') {
+    return <span>{value || 'N/A'}</span>;
+  }
+
+  const handleCopy = (e) => {
+    e.stopPropagation(); // prevent row click
+    navigator.clipboard.writeText(value)
+      .then(() => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      })
+      .catch(err => console.error('Failed to copy: ', err));
+  };
+
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+      <span>{value}</span>
+      <button 
+        onClick={handleCopy}
+        title={`Copy ${label}`}
+        style={{
+          background: copied ? 'var(--success-color, #10b981)' : 'transparent',
+          border: '1px solid ' + (copied ? 'var(--success-color, #10b981)' : 'var(--border-color, #cbd5e1)'),
+          borderRadius: '4px',
+          padding: '2px 6px',
+          fontSize: '0.75rem',
+          cursor: 'pointer',
+          color: copied ? '#fff' : 'var(--text-secondary)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '4px',
+          transition: 'all 0.2s ease',
+          lineHeight: '1.2'
+        }}
+      >
+        {copied ? 'Copied' : (
+          <>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+            </svg>
+            Copy
+          </>
+        )}
+      </button>
+    </div>
+  );
+};
+
 export default function Clients() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -304,6 +356,10 @@ export default function Clients() {
                 }}>
                   {activeCols.map(col => {
                     let content = client[col] || 'N/A';
+                    if (col === 'client_code') content = <CopyField value={client[col]} label="Client Code" />;
+                    if (col === 'pan_number') content = <CopyField value={client[col]} label="PAN Number" />;
+                    if (col === 'mobile_number') content = <CopyField value={client[col]} label="Mobile Number" />;
+                    
                     if (col === 'email_id') content = client.email || client.email_id || 'N/A';
                     if (col === 'application_date') content = client.application_date ? new Date(client.application_date).toLocaleDateString('en-GB') : 'N/A';
                     if (col === 'current_stage') content = formatCurrentStage(client.current_stage);

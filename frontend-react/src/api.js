@@ -31,7 +31,7 @@ const parseApiResponse = async (res, fallbackMessage) => {
   };
 };
 
-export const  = (theme) => {
+export const applyTheme = (theme) => {
   const isLight = theme === 'light';
   document.body.classList.toggle('light-mode', isLight);
 
@@ -42,16 +42,16 @@ export const  = (theme) => {
   });
 };
 
-export const  = () => {
+export const initThemeToggle = () => {
   const storedTheme = localStorage.getItem('kyc_dashboard_theme') || 'dark';
-  window.applyTheme(storedTheme);
+  applyTheme(storedTheme);
 
   const toggles = document.querySelectorAll('.theme-toggle');
   toggles.forEach(toggle => {
     toggle.addEventListener('click', () => {
       const nextTheme = document.body.classList.contains('light-mode') ? 'dark' : 'light';
       localStorage.setItem('kyc_dashboard_theme', nextTheme);
-      window.applyTheme(nextTheme);
+      applyTheme(nextTheme);
     });
   });
 };

@@ -362,7 +362,8 @@ export default function ClientDetail() {
     const lowerUrl = selectedDoc.url.split('?')[0].toLowerCase();
     
     if (lowerUrl.endsWith('.pdf')) {
-      return <iframe src={selectedDoc.url} style={{ width: '100%', height: '100%', border: 'none' }} title={selectedDoc.name} />;
+      const pdfUrl = selectedDoc.url.includes('#') ? selectedDoc.url : `${selectedDoc.url}#view=FitH`;
+      return <iframe src={pdfUrl} style={{ width: '100%', height: '100%', border: 'none' }} title={selectedDoc.name} />;
     }
     if (lowerUrl.endsWith('.jpg') || lowerUrl.endsWith('.jpeg') || lowerUrl.endsWith('.png') || lowerUrl.endsWith('.gif')) {
       return (

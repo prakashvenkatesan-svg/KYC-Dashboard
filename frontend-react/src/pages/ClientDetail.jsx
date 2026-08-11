@@ -30,6 +30,7 @@ const StageDataValue = ({ stageKey, fieldKey, fieldLabel, initialValue, onEdit }
   const handleEditClick = () => {
     setEditValue(value);
     setIsEditing(true);
+    window.hasUnsavedChanges = true;
   };
 
   const handleSave = async () => {
@@ -37,6 +38,7 @@ const StageDataValue = ({ stageKey, fieldKey, fieldLabel, initialValue, onEdit }
       const oldVal = value;
       setValue(editValue);
       setIsEditing(false);
+      window.hasUnsavedChanges = false;
       try {
         await onEdit(stageKey, fieldKey, editValue, oldVal, () => setValue(oldVal));
       } catch (e) {
@@ -44,6 +46,7 @@ const StageDataValue = ({ stageKey, fieldKey, fieldLabel, initialValue, onEdit }
       }
     } else {
       setIsEditing(false);
+      window.hasUnsavedChanges = false;
     }
   };
 
@@ -53,6 +56,7 @@ const StageDataValue = ({ stageKey, fieldKey, fieldLabel, initialValue, onEdit }
     } else if (e.key === 'Escape') {
       setIsEditing(false);
       setEditValue(value);
+      window.hasUnsavedChanges = false;
     }
   };
 

@@ -7,9 +7,7 @@ const {
   getClientKycStages,
   getIntegrationRecords,
   getPayments,
-  getStageTimestamps,
-  editClientField,
-  getSystemAuditLogs
+  getStageTimestamps
 } = require("./kycDashboardController");
 
 const { 
@@ -46,9 +44,6 @@ router.post("/users", verifyTokenMiddleware, requireAdminMiddleware, createUser)
 router.put("/users/:id", verifyTokenMiddleware, requireAdminMiddleware, updateUser);
 router.delete("/users/:id", verifyTokenMiddleware, requireAdminMiddleware, deleteUser);
 
-// Audit Logs (Admin Only)
-router.get("/audit-logs", verifyTokenMiddleware, requireAdminMiddleware, getSystemAuditLogs);
-
 // Dashboard Routes (Requires Authentication)
 router.get("/summary", verifyTokenMiddleware, getDashboardSummary);
 router.get("/clients", verifyTokenMiddleware, getClients);
@@ -58,8 +53,6 @@ router.get("/kyc-applications/:applicationId/details", verifyTokenMiddleware, ge
 router.get("/kyc-applications/:applicationId/stages", verifyTokenMiddleware, getClientKycStages);
 router.get("/integrations/:integrationName", verifyTokenMiddleware, getIntegrationRecords);
 router.get("/payments", verifyTokenMiddleware, getPayments);
-
-router.put("/clients/:clientCode/edit-field", verifyTokenMiddleware, requireAdminMiddleware, editClientField);
 
 router.post("/clients/:clientCode/skip-payment", verifyTokenMiddleware, requireAdminMiddleware, skipPaymentAction);
 router.put("/clients/:clientCode/skip-payment", verifyTokenMiddleware, requireAdminMiddleware, skipPaymentAction);

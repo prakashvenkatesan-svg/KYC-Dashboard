@@ -53,6 +53,81 @@ export default function Clients() {
   const integrationParam = searchParams.get('integration');
   const kycStatusParam = searchParams.get('kyc_status');
 
+  const [openActionMenuId, setOpenActionMenuId] = useState(null);
+  const [actionModal, setActionModal] = useState({ isOpen: false, type: '', client: null });
+  const [actionRemarks, setActionRemarks] = useState('');
+  const [actionStage, setActionStage] = useState('');
+  const [actionError, setActionError] = useState('');
+
+  useEffect(() => {
+    const handleClickOutside = () => setOpenActionMenuId(null);
+    document.addEventListener('click', handleClickOutside);
+    return () => document.removeEventListener('click', handleClickOutside);
+  }, []);
+
+  const STAGES_LIST = [
+    { value: 'mobile_verification', label: 'Mobile' },
+    { value: 'email_verification', label: 'Email' },
+    { value: 'pan_and_dob', label: 'PAN' },
+    { value: 'digilocker_details', label: 'DigiLocker' },
+    { value: 'personal_details', label: 'Personal Details' },
+    { value: 'bank_details', label: 'Bank' },
+    { value: 'nominee_details', label: 'Nominee' },
+    { value: 'live_photo', label: 'Live Photo' },
+    { value: 'signature_upload', label: 'Signature' },
+    { value: 'scheme_details', label: 'Payment Plan' },
+    { value: 'payment_summary', label: 'Payment Gateway' },
+    { value: 'esign', label: 'eSign' },
+    { value: 'completed', label: 'Completed' }
+  ];
+
+  const handleConfirmAction = async () => {
+    if (!actionRemarks.trim()) { setActionError('Remarks are mandatory.'); return; }
+    if (actionModal.type === 'step_back' && !actionStage) { setActionError('Please select a stage.'); return; }
+    
+    const client = actionModal.client;
+    const appId = client.application_id;
+    const clientCode = client.client_code && client.client_code !== 'N/A' ? client.client_code : null;
+    const clientName = client.client_name || 'Unknown';
+    const userStr = localStorage.getItem('kyc_user');
+    const user = userStr ? JSON.parse(userStr) : { name: 'Admin', role: 'Admin' };
+
+    try {
+      if (actionModal.type === 'delete') {
+        const res = await api.delete(`/kyc-applications/${appId}`);
+        if (res?.success) {
+          const records = JSON.parse(localStorage.getItem('kyc_trash_records') || '[]');
+          records.unshift({ application_id: appId, client_name: clientName, deleted_by: user.name, user_role: user.role, deleted_at: new Date().toISOString(), reason: actionRemarks, purge_at: new Date(Date.now() + 10 * 24 * 60 * 60 * 1000).toISOString() });
+          localStorage.setItem('kyc_trash_records', JSON.stringify(records));
+          alert('✅ Client record deleted. Moved to Trash.');
+          loadClients();
+          setActionModal({ isOpen: false, type: '', client: null });
+        } else { setActionError('❌ Delete failed: ' + (res?.message || 'Unknown error')); }
+      } else if (actionModal.type === 'payment_skip') {
+        const payload = { remarks: actionRemarks, skipped_by: user.name, user_role: user.role, action_type: 'payment_skip', application_id: appId, client_code: clientCode };
+        let success = false;
+        if (clientCode) { const res = await api.put(`/clients/${encodeURIComponent(clientCode)}/skip-payment`, payload).catch(()=>null); if (res?.success) success = true; }
+        if (!success) { const res = await api.put(`/kyc-applications/${appId}/skip-payment`, payload).catch(()=>null); if (res?.success) success = true; }
+        if (!success) { const res = await api.put(`/kyc-applications/${appId}/stages`, payload).catch(()=>null); if (res?.success) success = true; }
+        if (success) {
+          alert('✅ Payment step skipped.');
+          loadClients();
+          setActionModal({ isOpen: false, type: '', client: null });
+        } else { setActionError('❌ Payment skip failed.'); }
+      } else if (actionModal.type === 'step_back') {
+        const payload = { remarks: actionRemarks, moved_by: user.name, user_role: user.role, action_type: 'step_back', new_stage: actionStage, application_id: appId, client_code: clientCode };
+        let success = false;
+        if (clientCode) { const res = await api.put(`/clients/${encodeURIComponent(clientCode)}/stages`, payload).catch(()=>null); if (res?.success) success = true; }
+        if (!success) { const res = await api.put(`/kyc-applications/${appId}/stages`, payload).catch(()=>null); if (res?.success) success = true; }
+        if (success) {
+          alert('✅ Client stage updated.');
+          loadClients();
+          setActionModal({ isOpen: false, type: '', client: null });
+        } else { setActionError('❌ Stage update failed.'); }
+      }
+    } catch(err) { setActionError('❌ Error: ' + err.message); }
+  };
+
   const [clients, setClients] = useState([]);
   const [totalRecords, setTotalRecords] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -227,7 +302,18 @@ export default function Clients() {
                       content = <span style={{ color: 'var(--primary-color)', fontWeight: 500 }}>Check PDF</span>;
                     }
                     if (col === 'action') {
-                      content = <button onClick={(e) => { e.stopPropagation(); alert('Action Menu (Ported)'); }}>⚙ Actions</button>;
+                      content = (
+                        <div style={{ position: 'relative' }}>
+                          <button onClick={(e) => { e.stopPropagation(); setOpenActionMenuId(prev => prev === client.application_id ? null : client.application_id); }} style={{ padding: '4px 8px', borderRadius: '4px', background: 'var(--surface-color)', border: '1px solid var(--border-color)', color: 'var(--text-color)', cursor: 'pointer' }}>⚙ Actions</button>
+                          {openActionMenuId === client.application_id && (
+                            <div style={{ position: 'absolute', right: 0, top: '100%', zIndex: 10, background: 'var(--surface-color)', border: '1px solid var(--border-color)', borderRadius: '6px', boxShadow: '0 4px 12px rgba(0,0,0,0.2)', padding: '4px 0', minWidth: '150px' }}>
+                              <button onClick={(e) => { e.stopPropagation(); setOpenActionMenuId(null); setActionModal({ isOpen: true, type: 'delete', client }); setActionRemarks(''); setActionError(''); }} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '8px 12px', background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer' }}>🗑 Delete</button>
+                              <button onClick={(e) => { e.stopPropagation(); setOpenActionMenuId(null); setActionModal({ isOpen: true, type: 'payment_skip', client }); setActionRemarks(''); setActionError(''); }} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '8px 12px', background: 'transparent', border: 'none', color: 'var(--text-color)', cursor: 'pointer' }}>⏭ Payment Skip</button>
+                              <button onClick={(e) => { e.stopPropagation(); setOpenActionMenuId(null); setActionModal({ isOpen: true, type: 'step_back', client }); setActionRemarks(''); setActionStage(''); setActionError(''); }} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '8px 12px', background: 'transparent', border: 'none', color: 'var(--text-color)', cursor: 'pointer' }}>↩ Change Stage</button>
+                            </div>
+                          )}
+                        </div>
+                      );
                     }
                     return <td key={col}>{content}</td>;
                   })}
@@ -245,6 +331,39 @@ export default function Clients() {
           <button onClick={() => setCurrentPage(prev => prev + 1)} disabled={currentPage * limit >= totalRecords}>Next</button>
         </div>
       </div>
+
+      {actionModal.isOpen && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={(e) => { e.stopPropagation(); setActionModal({ isOpen: false, type: '', client: null }); }}>
+          <div style={{ background: 'var(--surface-color)', borderRadius: '8px', padding: '24px', width: '400px', maxWidth: '90%', border: '1px solid var(--border-color)', boxShadow: '0 4px 12px rgba(0,0,0,0.2)' }} onClick={e => e.stopPropagation()}>
+            <h3 style={{ marginTop: 0, marginBottom: '16px', color: 'var(--text-color)' }}>
+              {actionModal.type === 'delete' ? '🗑 Delete Client' : actionModal.type === 'payment_skip' ? '⏭ Skip Payment' : '↩ Change Stage'}
+            </h3>
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '16px' }}>For client: <strong>{actionModal.client?.client_name || 'Unknown'}</strong> ({actionModal.client?.application_id})</p>
+            
+            {actionModal.type === 'step_back' && (
+              <div style={{ marginBottom: '16px' }}>
+                <label style={{ display: 'block', marginBottom: '8px', color: 'var(--text-color)' }}>Select Target Stage:</label>
+                <select value={actionStage} onChange={e => setActionStage(e.target.value)} style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid var(--border-color)', background: 'var(--bg-color)', color: 'var(--text-color)' }}>
+                  <option value="">-- Select Stage --</option>
+                  {STAGES_LIST.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+                </select>
+              </div>
+            )}
+            
+            <div style={{ marginBottom: '16px' }}>
+              <label style={{ display: 'block', marginBottom: '8px', color: 'var(--text-color)' }}>Remarks (Mandatory):</label>
+              <textarea value={actionRemarks} onChange={e => setActionRemarks(e.target.value)} rows="3" style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid var(--border-color)', background: 'var(--bg-color)', color: 'var(--text-color)', resize: 'vertical' }} placeholder="Enter reason..." />
+            </div>
+
+            {actionError && <div style={{ color: '#ef4444', fontSize: '0.85rem', marginBottom: '16px' }}>{actionError}</div>}
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
+              <button onClick={() => setActionModal({ isOpen: false, type: '', client: null })} style={{ padding: '8px 16px', borderRadius: '4px', background: 'transparent', border: '1px solid var(--border-color)', color: 'var(--text-color)', cursor: 'pointer' }}>Cancel</button>
+              <button onClick={handleConfirmAction} style={{ padding: '8px 16px', borderRadius: '4px', background: actionModal.type === 'delete' ? '#ef4444' : 'var(--primary-color)', color: 'white', border: 'none', cursor: 'pointer', fontWeight: 500 }}>Confirm</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

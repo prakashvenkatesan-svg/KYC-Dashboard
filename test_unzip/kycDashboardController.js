@@ -582,11 +582,11 @@ const getPayments = async (req, res) => {
 };
 
 const editClientField = async (req, res) => {
-  const { clientCode } = req.params;
+  const { applicationId } = req.params;
   const { stage_key, field_key, new_value } = req.body;
 
-  if (!clientCode || !stage_key || !field_key) {
-    return res.status(400).json({ success: false, message: "clientCode, stage_key, and field_key are required" });
+  if (!applicationId || !stage_key || !field_key) {
+    return res.status(400).json({ success: false, message: "applicationId, stage_key, and field_key are required" });
   }
 
   // Determine target table based on stage
@@ -627,22 +627,6 @@ const editClientField = async (req, res) => {
   try {
     await client.query('BEGIN');
     
-    // Lookup applicationId from clientCode
-    const appQuery = await client.query(
-      `SELECT ka.id FROM public.kyc_applications ka 
-       LEFT JOIN public.contact_details cd ON cd.application_id = ka.id
-       LEFT JOIN public.client_codes cc ON cc.email = cd.email
-       WHERE COALESCE(cc.client_code, ka.client_code) = $1 
-       ORDER BY ka.id DESC LIMIT 1`,
-      [clientCode]
-    );
-
-    if (appQuery.rows.length === 0) {
-      await client.query('ROLLBACK');
-      return res.status(404).json({ success: false, message: "Client not found" });
-    }
-    const applicationId = appQuery.rows[0].id;
-
     // Check if a row exists for this application
     const checkRes = await client.query(`SELECT 1 FROM public.${targetTable} WHERE application_id = $1`, [applicationId]);
     if (checkRes.rowCount === 0) {
@@ -712,72 +696,12 @@ const getStageTimestamps = async (req, res) => {
       console.warn("Table stage_lifecycle_timestamps might not exist yet.", e.message);
     }
 
-    // --- FALLBACK LOGIC FOR EXISTING RECORDS ---
-    // If the record was processed before the trigger was added, pull timestamps from individual tables.
-    const fallbackTables = [
-      { stage_name: 'mobile_verification', table: 'contact_details' },
-      { stage_name: 'email_verification', table: 'contact_details' },
-      { stage_name: 'pan_and_dob', table: 'identity_verifications' },
-      { stage_name: 'digilocker_details', table: 'digilocker_details' },
-      { stage_name: 'personal_details', table: 'personal_details' },
-      { stage_name: 'bank_details', table: 'bank_details' },
-      { stage_name: 'nominee_details', table: 'nominee_details' },
-      { stage_name: 'live_photo', table: 'applicant_photo_uploads' },
-      { stage_name: 'signature_upload', table: 'signature_uploads' },
-      { stage_name: 'scheme_details', table: 'payments_details' },
-      { stage_name: 'esign', table: 'esign_audit_logs' }
-    ];
-
-    const existingStages = new Set(lifecycleData.map(l => l.stage_name));
-
-    for (const fb of fallbackTables) {
-      if (!existingStages.has(fb.stage_name)) {
-        try {
-          const res = await pool.query(`SELECT created_at, updated_at FROM public.${fb.table} WHERE application_id = $1 LIMIT 1`, [applicationId]);
-          if (res.rows.length > 0) {
-             const row = res.rows[0];
-             lifecycleData.push({
-               stage_name: fb.stage_name,
-               entered_at: row.created_at || row.updated_at,
-               completed_at: row.updated_at || row.created_at,
-               duration_seconds: null
-             });
-          }
-        } catch (e) {
-          // Table or column might not exist for some, just ignore silently
-        }
-      }
-    }
-
     return res.status(200).json({
       success: true,
       data: lifecycleData
     });
   } catch (error) {
     console.error("Get stage timestamps error:", error);
-    return res.status(500).json({ success: false, message: "Server error", error: error.message });
-  }
-};
-
-const getSystemAuditLogs = async (req, res) => {
-  try {
-    const query = `
-      SELECT id, user_id, user_name, user_role, action_type, module, 
-             entity_type, entity_id, client_code, field_name, 
-             old_value, new_value, changes_json, description, 
-             ip_address, created_at
-      FROM public.system_audit_logs
-      ORDER BY created_at DESC
-      LIMIT 500
-    `;
-    const { rows } = await pool.query(query);
-    
-    return res.status(200).json({
-      success: true,
-      data: rows
-    });
-  } catch (error) {
-    console.error("Get system audit logs error:", error);
     return res.status(500).json({ success: false, message: "Server error", error: error.message });
   }
 };
@@ -790,7 +714,5 @@ module.exports = {
   getClientKycStages,
   getIntegrationRecords,
   getPayments,
-  editClientField,
-  getStageTimestamps,
-  getSystemAuditLogs
+  editClientField
 };

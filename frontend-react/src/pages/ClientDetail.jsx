@@ -254,27 +254,64 @@ export default function ClientDetail() {
   const extractDocuments = (stages) => {
     if (!stages) return;
     const s3Base = 'https://aionion-kyc-staging-documents.s3.ap-south-1.amazonaws.com/clients';
-    const docs = [];
+    
+    const extractedDocs = [];
+    
+    const extractUrls = (obj, path = '') => {
+      if (!obj) return;
+      
+      if (typeof obj === 'object' && !Array.isArray(obj)) {
+        for (const [k, v] of Object.entries(obj)) {
+          if (k === 'file_path' && typeof v === 'string' && v.includes('/uploads/')) {
+            const url = v.startsWith('/') ? s3Base + v : s3Base + '/' + v;
+            let docName = path || 'Document';
+            docName = docName.replace(/_/g, ' ').replace(/(?:^|\s)\S/g, a => a.toUpperCase());
+            extractedDocs.push({ name: docName, url: url });
+          }
+        }
+      }
+
+      if (typeof obj === 'string' && (obj.startsWith('http://') || obj.startsWith('https://'))) {
+        let docName = path || 'Document';
+        docName = docName.replace(/_/g, ' ').replace(/(?:^|\s)\S/g, a => a.toUpperCase());
+        extractedDocs.push({ name: docName, url: obj });
+      } else if (typeof obj === 'object') {
+        for (const [k, v] of Object.entries(obj)) {
+          extractUrls(v, k);
+        }
+      }
+    };
+    
+    extractUrls(stages);
+    
+    const explicitDocs = [];
     const getS3Url = (pathOrUrl) => {
         if (!pathOrUrl) return null;
         if (pathOrUrl.startsWith('http')) return pathOrUrl;
         return pathOrUrl.startsWith('/') ? s3Base + pathOrUrl : s3Base + '/' + pathOrUrl;
     };
 
-    if (stages.pan_and_dob?.upload?.s3_url || stages.pan_and_dob?.file_path) docs.push({ name: 'Uploadpan', url: getS3Url(stages.pan_and_dob.upload?.s3_url || stages.pan_and_dob.file_path) });
-    if (stages.live_photo?.s3_url || stages.live_photo?.file_path) docs.push({ name: 'Clientimage', url: getS3Url(stages.live_photo.s3_url || stages.live_photo.file_path) });
-    if (stages.signature_upload?.s3_url || stages.signature_upload?.file_path) docs.push({ name: 'Signature upload', url: getS3Url(stages.signature_upload.s3_url || stages.signature_upload.file_path) });
-    if (stages.esign?.audit_log?.document_url) docs.push({ name: 'Esigned pdf', url: getS3Url(stages.esign.audit_log.document_url) });
-    if (stages.esign?.application_info?.signed_pdf_url) docs.push({ name: 'Esigned pdf (Legacy)', url: getS3Url(stages.esign.application_info.signed_pdf_url) });
+    if (stages.pan_and_dob?.upload?.s3_url || stages.pan_and_dob?.file_path) explicitDocs.push({ name: 'Uploadpan', url: getS3Url(stages.pan_and_dob.upload?.s3_url || stages.pan_and_dob.file_path) });
+    if (stages.live_photo?.s3_url || stages.live_photo?.file_path) explicitDocs.push({ name: 'Clientimage', url: getS3Url(stages.live_photo.s3_url || stages.live_photo.file_path) });
+    if (stages.signature_upload?.s3_url || stages.signature_upload?.file_path) explicitDocs.push({ name: 'Signature upload', url: getS3Url(stages.signature_upload.s3_url || stages.signature_upload.file_path) });
+    if (stages.esign?.audit_log?.document_url) explicitDocs.push({ name: 'Esigned pdf', url: getS3Url(stages.esign.audit_log.document_url) });
+    if (stages.esign?.application_info?.signed_pdf_url) explicitDocs.push({ name: 'Esigned pdf (Legacy)', url: getS3Url(stages.esign.application_info.signed_pdf_url) });
     
     if (stages.nominee_details && Array.isArray(stages.nominee_details)) {
         stages.nominee_details.forEach((n, idx) => {
-            if (n.proof_file_url || n.file_path) docs.push({ name: `Nominee ${idx+1} upload`, url: getS3Url(n.proof_file_url || n.file_path) });
+            if (n.proof_file_url || n.file_path) explicitDocs.push({ name: `Nominee ${idx+1} upload`, url: getS3Url(n.proof_file_url || n.file_path) });
         });
     }
 
-    setDocuments(docs);
-    if (docs.length > 0) setSelectedDoc(docs[0]);
+    const finalDocs = [...explicitDocs];
+    extractedDocs.forEach(d => {
+       if (!finalDocs.find(fd => fd.url === d.url)) {
+           finalDocs.push({ name: d.name, url: d.url });
+       }
+    });
+
+    setDocuments(finalDocs);
+    if (finalDocs.length > 0) setSelectedDoc(finalDocs[0]);
   };
 
   const handleEdit = async (stageKey, fieldKey, newVal, oldVal, revert) => {

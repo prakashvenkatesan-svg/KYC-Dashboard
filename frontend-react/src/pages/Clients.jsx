@@ -154,6 +154,23 @@ export default function Clients() {
           <option value="Uploaded">Uploaded</option>
         </select>
 
+        <select value={currentStage} onChange={(e) => { setCurrentStage(e.target.value); setCurrentPage(1); }} style={{ padding: '8px', borderRadius: '6px', border: '1px solid var(--border-color)', background: 'var(--bg-color)', color: 'var(--text-color)' }}>
+          <option value="">All Stages</option>
+          <option value="mobile_verification">Mobile</option>
+          <option value="email_verification">Email</option>
+          <option value="pan_and_dob">PAN</option>
+          <option value="digilocker_details">DigiLocker</option>
+          <option value="personal_details">Personal Details</option>
+          <option value="bank_details">Bank</option>
+          <option value="nominee_details">Nominee</option>
+          <option value="live_photo">Live Photo</option>
+          <option value="signature_upload">Signature</option>
+          <option value="scheme_details">Payment Plan</option>
+          <option value="payment_summary">Payment Gateway</option>
+          <option value="esign">eSign</option>
+          <option value="completed">Completed</option>
+        </select>
+
         <input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} style={{ padding: '8px', borderRadius: '6px', border: '1px solid var(--border-color)', background: 'var(--bg-color)', color: 'var(--text-color)' }} />
         <input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} style={{ padding: '8px', borderRadius: '6px', border: '1px solid var(--border-color)', background: 'var(--bg-color)', color: 'var(--text-color)' }} />
         
@@ -195,6 +212,7 @@ export default function Clients() {
                 }}>
                   {activeCols.map(col => {
                     let content = client[col] || 'N/A';
+                    if (col === 'email_id') content = client.email || client.email_id || 'N/A';
                     if (col === 'application_date') content = client.application_date ? new Date(client.application_date).toLocaleDateString('en-GB') : 'N/A';
                     if (col === 'current_stage') content = formatCurrentStage(client.current_stage);
                     

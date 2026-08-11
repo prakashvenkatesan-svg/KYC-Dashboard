@@ -133,20 +133,37 @@ export default function Clients() {
   const [loading, setLoading] = useState(false);
   const limit = 20;
 
+  const getInitialState = (key, defaultVal) => {
+    const saved = sessionStorage.getItem(`kyc_clients_filter_${key}`);
+    return saved !== null ? saved : defaultVal;
+  };
+
   // Filters State
-  const [currentPage, setCurrentPage] = useState(1);
-  const [search, setSearch] = useState('');
-  const [integration, setIntegration] = useState(integrationParam || '');
-  const [status, setStatus] = useState('');
-  const [currentStage, setCurrentStage] = useState('');
-  const [fromDate, setFromDate] = useState('');
-  const [toDate, setToDate] = useState('');
+  const [currentPage, setCurrentPage] = useState(() => parseInt(getInitialState('currentPage', 1), 10));
+  const [search, setSearch] = useState(() => getInitialState('search', ''));
+  const [integration, setIntegration] = useState(() => integrationParam || getInitialState('integration', ''));
+  const [status, setStatus] = useState(() => getInitialState('status', ''));
+  const [currentStage, setCurrentStage] = useState(() => getInitialState('currentStage', ''));
+  const [fromDate, setFromDate] = useState(() => getInitialState('fromDate', ''));
+  const [toDate, setToDate] = useState(() => getInitialState('toDate', ''));
   
   // Sorting & Columns State
-  const [sortBy, setSortBy] = useState('application_date');
-  const [sortOrder, setSortOrder] = useState('desc');
+  const [sortBy, setSortBy] = useState(() => getInitialState('sortBy', 'application_date'));
+  const [sortOrder, setSortOrder] = useState(() => getInitialState('sortOrder', 'desc'));
   const [visibleColumns, setVisibleColumns] = useState(DEFAULT_VISIBLE);
   const [columnOrder, setColumnOrder] = useState(DEFAULT_ORDER);
+
+  useEffect(() => {
+    sessionStorage.setItem('kyc_clients_filter_currentPage', currentPage);
+    sessionStorage.setItem('kyc_clients_filter_search', search);
+    sessionStorage.setItem('kyc_clients_filter_integration', integration);
+    sessionStorage.setItem('kyc_clients_filter_status', status);
+    sessionStorage.setItem('kyc_clients_filter_currentStage', currentStage);
+    sessionStorage.setItem('kyc_clients_filter_fromDate', fromDate);
+    sessionStorage.setItem('kyc_clients_filter_toDate', toDate);
+    sessionStorage.setItem('kyc_clients_filter_sortBy', sortBy);
+    sessionStorage.setItem('kyc_clients_filter_sortOrder', sortOrder);
+  }, [currentPage, search, integration, status, currentStage, fromDate, toDate, sortBy, sortOrder]);
 
   useEffect(() => {
     if (integrationParam) setIntegration(integrationParam);

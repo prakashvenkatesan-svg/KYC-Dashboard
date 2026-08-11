@@ -196,7 +196,7 @@ export default function ClientDetail() {
       try {
         let detailsData;
         let cData = null;
-        if (clientCode && clientCode.startsWith('APP-')) {
+        if (clientCode && (clientCode.startsWith('APP-') || /^\d+$/.test(clientCode))) {
           detailsData = await api.getClientById(clientCode);
         } else {
           detailsData = await api.getClientByCode(clientCode);

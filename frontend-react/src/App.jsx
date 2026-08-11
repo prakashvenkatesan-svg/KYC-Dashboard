@@ -16,6 +16,13 @@ function App() {
       <Routes>
         <Route path="/login" element={<Login />} />
         
+        {/* Legacy Vanilla HTML Redirects */}
+        <Route path="/login.html" element={<Navigate to="/login" replace />} />
+        <Route path="/index.html" element={<Navigate to="/dashboard" replace />} />
+        <Route path="/clients.html" element={<Navigate to="/clients" replace />} />
+        <Route path="/payments.html" element={<Navigate to="/payments" replace />} />
+        
+
         <Route path="/" element={<Layout />}>
           <Route index element={<Navigate to="/dashboard" replace />} />
           <Route path="dashboard" element={<Dashboard />} />

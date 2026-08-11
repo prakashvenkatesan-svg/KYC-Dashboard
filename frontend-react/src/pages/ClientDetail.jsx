@@ -24,17 +24,35 @@ const EditIcon = ({ onClick }) => (
 
 const StageDataValue = ({ stageKey, fieldKey, fieldLabel, initialValue, onEdit }) => {
   const [value, setValue] = useState(initialValue);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editValue, setEditValue] = useState(initialValue);
   
-  const handleEdit = async () => {
-    const newVal = prompt(`Edit ${fieldLabel}:`, value);
-    if (newVal !== null && newVal !== value) {
+  const handleEditClick = () => {
+    setEditValue(value);
+    setIsEditing(true);
+  };
+
+  const handleSave = async () => {
+    if (editValue !== value) {
       const oldVal = value;
-      setValue(newVal);
+      setValue(editValue);
+      setIsEditing(false);
       try {
-        await onEdit(stageKey, fieldKey, newVal, oldVal, () => setValue(oldVal));
+        await onEdit(stageKey, fieldKey, editValue, oldVal, () => setValue(oldVal));
       } catch (e) {
         setValue(oldVal);
       }
+    } else {
+      setIsEditing(false);
+    }
+  };
+
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter') {
+      handleSave();
+    } else if (e.key === 'Escape') {
+      setIsEditing(false);
+      setEditValue(value);
     }
   };
 
@@ -45,11 +63,29 @@ const StageDataValue = ({ stageKey, fieldKey, fieldLabel, initialValue, onEdit }
     displayValue = <a href={value} target="_blank" rel="noreferrer" style={{ color: 'var(--primary-color)', textDecoration: 'underline' }}>View Link</a>;
   }
 
+  if (isEditing) {
+    return (
+      <div style={{ backgroundColor: 'var(--surface-color)', border: '1px solid var(--primary-color)', borderRadius: 6, padding: '8px 10px', position: 'relative', boxShadow: '0 0 0 2px rgba(99, 102, 241, 0.2)' }}>
+        <div style={{ color: '#64748b', fontSize: '0.75rem', marginBottom: 2, textTransform: 'capitalize' }}>{fieldLabel}</div>
+        <input 
+          type="text" 
+          value={editValue} 
+          onChange={(e) => setEditValue(e.target.value)}
+          onBlur={handleSave}
+          onKeyDown={handleKeyDown}
+          autoFocus
+          style={{ width: '90%', border: 'none', outline: 'none', fontWeight: 600, fontSize: '0.95rem', color: 'var(--text-primary)', background: 'transparent' }}
+        />
+        <EditIcon onClick={handleSave} />
+      </div>
+    );
+  }
+
   return (
-    <div style={{ backgroundColor: '#f1f3f5', border: '1px solid #e2e8f0', borderRadius: 6, padding: '10px 12px', position: 'relative' }}>
+    <div style={{ backgroundColor: 'var(--surface-hover)', border: '1px solid var(--border-color)', borderRadius: 6, padding: '10px 12px', position: 'relative' }}>
       <div style={{ color: '#64748b', fontSize: '0.75rem', marginBottom: 2, textTransform: 'capitalize' }}>{fieldLabel}</div>
-      <div style={{ fontWeight: 600, fontSize: '0.95rem', color: '#1e293b', wordBreak: 'break-all' }}>{displayValue}</div>
-      <EditIcon onClick={handleEdit} />
+      <div style={{ fontWeight: 600, fontSize: '0.95rem', color: 'var(--text-primary)', wordBreak: 'break-all' }}>{displayValue}</div>
+      <EditIcon onClick={handleEditClick} />
     </div>
   );
 };

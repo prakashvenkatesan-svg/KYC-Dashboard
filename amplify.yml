@@ -7,6 +7,7 @@ frontend:
         - npm install
     build:
       commands:
+        - cd frontend-react
         - npm run build
   artifacts:
     baseDirectory: frontend-react/dist
@@ -15,3 +16,7 @@ frontend:
   cache:
     paths:
       - frontend-react/node_modules/**/*
+customRules:
+  - source: '</^[^.]+$|\.(?!(css|gif|ico|jpg|js|png|txt|svg|woff|woff2|ttf|map|json|webp)$)([^.]+$)/>'
+    status: '200'
+    target: '/index.html'

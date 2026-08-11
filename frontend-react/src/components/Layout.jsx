@@ -5,6 +5,7 @@ import Sidebar from './Sidebar';
 export default function Layout() {
   const navigate = useNavigate();
   const [userName, setUserName] = useState('Loading...');
+  const [theme, setTheme] = useState(localStorage.getItem('kyc_dashboard_theme') || 'dark');
 
   useEffect(() => {
     // Basic auth check placeholder - you will replace this with real logic
@@ -21,6 +22,12 @@ export default function Layout() {
     }
   }, [navigate]);
 
+  useEffect(() => {
+    const isLight = theme === 'light';
+    document.body.classList.toggle('light-mode', isLight);
+    localStorage.setItem('kyc_dashboard_theme', theme);
+  }, [theme]);
+
   const handleLogout = () => {
     localStorage.removeItem('kyc_user');
     localStorage.removeItem('kyc_token');
@@ -28,8 +35,7 @@ export default function Layout() {
   };
 
   const toggleTheme = () => {
-    const body = document.body;
-    body.classList.toggle('light-mode');
+    setTheme(prevTheme => prevTheme === 'light' ? 'dark' : 'light');
   };
 
   return (
@@ -41,7 +47,9 @@ export default function Layout() {
         <header className="top-header">
           <h1 id="page-title">KYC Dashboard</h1>
           <div className="user-profile" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <button id="theme-toggle" className="theme-toggle" type="button" onClick={toggleTheme}>Toggle Mode</button>
+            <button id="theme-toggle" className="theme-toggle" type="button" onClick={toggleTheme} aria-label={theme === 'light' ? 'Switch to dark mode' : 'Switch to light mode'}>
+              {theme === 'light' ? 'Dark Mode' : 'Light Mode'}
+            </button>
             <span id="logged-in-user">{userName}</span>
             <button id="logout-btn" onClick={handleLogout} style={{ background: 'transparent', border: '1px solid var(--surface-border)', color: 'var(--text-primary)', cursor: 'pointer', padding: '4px 8px', borderRadius: '4px' }}>Logout</button>
           </div>

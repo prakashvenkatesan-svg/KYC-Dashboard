@@ -7,6 +7,7 @@ import ClientDetail from './pages/ClientDetail';
 import Payments from './pages/Payments';
 import Trash from './pages/Trash';
 import Users from './pages/Users';
+import AuditLogs from './pages/AuditLogs';
 import Login from './pages/Login';
 
 function App() {
@@ -23,6 +24,7 @@ function App() {
           <Route path="payments" element={<Payments />} />
           <Route path="trash" element={<Trash />} />
           <Route path="users" element={<Users />} />
+          <Route path="audit-logs" element={<AuditLogs />} />
         </Route>
       </Routes>
     </BrowserRouter>

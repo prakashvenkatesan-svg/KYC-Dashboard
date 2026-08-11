@@ -325,14 +325,26 @@ export default function ClientDetail() {
     }
     if (lowerUrl.endsWith('.jpg') || lowerUrl.endsWith('.jpeg') || lowerUrl.endsWith('.png') || lowerUrl.endsWith('.gif')) {
       return (
-        <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'auto', position: 'relative', backgroundColor: 'var(--bg-color)' }}>
+        <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', position: 'relative' }}>
           <img src={selectedDoc.url} alt={selectedDoc.name} style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', transition: 'transform 0.2s ease-out', transform: `scale(${zoom}) rotate(${rotation}deg)` }} />
-          <div style={{ position: 'absolute', bottom: 20, left: '50%', transform: 'translateX(-50%)', display: 'flex', gap: 16, background: 'rgba(0,0,0,0.7)', padding: '10px 20px', borderRadius: 30, zIndex: 10 }}>
-            <button onClick={() => setZoom(z => Math.max(0.2, z - 0.2))} style={{ background: 'none', border: 'none', color: 'white', cursor: 'pointer', fontSize: 22 }}>−</button>
-            <button onClick={() => { setZoom(1); setRotation(0); }} style={{ background: 'none', border: 'none', color: 'white', cursor: 'pointer', fontSize: 20 }}>↺</button>
-            <button onClick={() => setZoom(z => z + 0.2)} style={{ background: 'none', border: 'none', color: 'white', cursor: 'pointer', fontSize: 22 }}>+</button>
-            <div style={{ width: 1, background: 'rgba(255,255,255,0.3)', margin: '0 4px' }}></div>
-            <button onClick={() => setRotation(r => r + 90)} style={{ background: 'none', border: 'none', color: 'white', cursor: 'pointer', fontSize: 20 }}>↻</button>
+          
+          <div style={{ position: 'absolute', bottom: 20, right: 20, display: 'flex', gap: 12, alignItems: 'center', background: '#ffffff', padding: '6px 16px', borderRadius: '30px', zIndex: 10, border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}>
+            <button onClick={() => setZoom(z => Math.max(0.2, z - 0.2))} style={{ background: 'none', border: 'none', color: '#0f172a', cursor: 'pointer', fontSize: 16, padding: '0 4px', display: 'flex', alignItems: 'center' }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line><line x1="8" y1="11" x2="14" y2="11"></line></svg>
+            </button>
+            <button onClick={() => setZoom(z => z + 0.2)} style={{ background: 'none', border: 'none', color: '#0f172a', cursor: 'pointer', fontSize: 16, padding: '0 4px', display: 'flex', alignItems: 'center' }}>
+               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line><line x1="11" y1="8" x2="11" y2="14"></line><line x1="8" y1="11" x2="14" y2="11"></line></svg>
+            </button>
+            <button onClick={() => setRotation(r => r - 90)} style={{ background: 'none', border: 'none', color: '#0f172a', cursor: 'pointer', fontSize: 16, padding: '0 4px', display: 'flex', alignItems: 'center' }}>
+               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path><path d="M3 3v5h5"></path></svg>
+            </button>
+            <button onClick={() => setRotation(r => r + 90)} style={{ background: 'none', border: 'none', color: '#0f172a', cursor: 'pointer', fontSize: 16, padding: '0 4px', display: 'flex', alignItems: 'center' }}>
+               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 1 1-9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"></path><path d="M21 3v5h-5"></path></svg>
+            </button>
+            <button onClick={() => { setZoom(1); setRotation(0); }} style={{ background: 'none', border: 'none', color: '#0f172a', cursor: 'pointer', fontSize: 16, padding: '0 4px', display: 'flex', alignItems: 'center' }}>
+               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline><line x1="21" y1="3" x2="14" y2="10"></line><line x1="3" y1="21" x2="10" y2="14"></line></svg>
+            </button>
+            <span style={{ display: 'flex', alignItems: 'center', fontWeight: 600, color: '#2563eb', fontSize: '0.85rem', marginLeft: '4px' }}>{Math.round(zoom * 100)}%</span>
           </div>
         </div>
       );
@@ -341,57 +353,63 @@ export default function ClientDetail() {
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      <header className="top-header" style={{ padding: '16px 24px', background: 'var(--surface-color)', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div>
-          <h1 id="client-name" style={{ margin: '0 0 8px 0', fontSize: '1.5rem', fontWeight: 600 }}>{clientName}</h1>
-          <p id="client-code-pan" style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
-            <strong>Code:</strong> {clientCodeStr} &bull; <strong>PAN:</strong> {clientPan} &bull; <strong>Email:</strong> {clientEmail} &bull; <strong>Phone:</strong> {clientPhone}
-            {clientStageLabel && <><br/><strong>Current Stage:</strong> {clientStageLabel}</>}
-          </p>
-        </div>
-      </header>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: '#f8fafc' }}>
+      <header className="top-header" style={{ display: 'none' }}></header> {/* Hidden as per screenshot 1 */}
 
-      <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
-        <div style={{ flex: '1 1 40%', overflowY: 'auto', borderRight: '1px solid var(--border-color)', background: 'var(--surface-color)' }}>
-          <div style={{ padding: '16px 24px', borderBottom: '1px solid var(--border-color)' }}>
-            <h2 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 600 }}>KYC Modules</h2>
+      <div style={{ display: 'flex', flex: 1, overflow: 'hidden', padding: '12px', gap: '12px' }}>
+        
+        {/* Modules Column */}
+        <div style={{ flex: '0 0 280px', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: '#ffffff', borderRadius: '8px', border: '1px solid #e2e8f0', boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)' }}>
+          <div style={{ padding: '12px', background: '#e6f0ff', color: '#1d4ed8', textAlign: 'center', fontSize: '0.9rem', fontWeight: 600, margin: '8px 8px 0 8px', borderRadius: '4px' }}>
+            Modules
           </div>
-          <div id="modules-accordion">
+          <div id="modules-accordion" style={{ overflowY: 'auto', padding: '8px' }}>
             {stageDefs.map(def => (
               <AccordionItem key={def.key} title={def.label} stageData={data.stages?.[def.key]} stageKey={def.key} timestamp={timestamps[def.label]} onEdit={handleEdit} />
             ))}
           </div>
         </div>
 
-        <div style={{ flex: '1 1 60%', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'var(--bg-color)' }}>
-          <div style={{ padding: '12px 24px', borderBottom: '1px solid var(--border-color)', background: 'var(--surface-color)', display: 'flex', gap: 16, overflowX: 'auto' }}>
-            <h2 style={{ margin: 0, fontSize: '1rem', fontWeight: 600, display: 'flex', alignItems: 'center' }}>Documents</h2>
+        {/* Documents Column */}
+        <div style={{ flex: '0 0 220px', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: '#ffffff', borderRadius: '8px', border: '1px solid #e2e8f0', boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)' }}>
+          <div style={{ padding: '12px', background: '#e6f0ff', color: '#1d4ed8', textAlign: 'center', fontSize: '0.9rem', fontWeight: 600, margin: '8px 8px 0 8px', borderRadius: '4px' }}>
+            Documents
           </div>
-          <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
-            <div style={{ width: 220, borderRight: '1px solid var(--border-color)', background: 'var(--surface-color)', overflowY: 'auto' }}>
-              {documents.length === 0 ? (
-                <div style={{ padding: 16, color: 'var(--text-secondary)', textAlign: 'center' }}>No documents found.</div>
-              ) : (
-                documents.map((doc, idx) => (
-                  <div key={idx} onClick={() => { setSelectedDoc(doc); setZoom(1); setRotation(0); }} style={{ padding: '10px 16px', cursor: 'pointer', borderBottom: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', color: selectedDoc?.url === doc.url ? 'var(--primary-color)' : 'var(--text-primary)', background: selectedDoc?.url === doc.url ? 'rgba(99,102,241,0.1)' : 'transparent' }}>
-                    <span style={{ fontSize: '0.95rem' }}>{doc.name}</span>
-                    <span style={{ color: 'var(--text-muted)', fontSize: '1.1rem', transform: 'rotate(45deg)' }}>📌</span>
-                  </div>
-                ))
-              )}
-            </div>
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: 'var(--bg-color)' }}>
-              <div style={{ padding: '12px 16px', background: 'var(--surface-color)', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <h3 style={{ margin: 0, fontSize: '1rem' }}>{selectedDoc ? selectedDoc.name : 'Preview'}</h3>
-                {selectedDoc && <a href={selectedDoc.url} target="_blank" rel="noreferrer" style={{ textDecoration: 'none', color: 'var(--primary-color)', fontSize: '0.9rem', fontWeight: 500 }}>Open in new tab ↗</a>}
-              </div>
-              <div style={{ flex: 1, overflow: 'hidden', position: 'relative' }}>
-                {renderDocumentPreview()}
-              </div>
-            </div>
+          <div style={{ overflowY: 'auto', padding: '8px 0' }}>
+            {documents.length === 0 ? (
+              <div style={{ padding: 16, color: 'var(--text-secondary)', textAlign: 'center' }}>No documents found.</div>
+            ) : (
+              documents.map((doc, idx) => (
+                <div key={idx} onClick={() => { setSelectedDoc(doc); setZoom(1); setRotation(0); }} style={{ padding: '12px 16px', cursor: 'pointer', borderBottom: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'space-between', color: selectedDoc?.url === doc.url ? '#1d4ed8' : '#475569', background: '#ffffff' }}>
+                  <span style={{ fontSize: '0.85rem', fontWeight: 500 }}>{doc.name}</span>
+                  <span style={{ color: '#94a3b8', fontSize: '1rem', transform: 'rotate(45deg)' }}>📌</span>
+                </div>
+              ))
+            )}
           </div>
         </div>
+
+        {/* Preview Column */}
+        <div style={{ flex: '1', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: '#ffffff', borderRadius: '8px', border: '1px solid #e2e8f0', boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)', position: 'relative' }}>
+          
+          <div style={{ display: 'flex', flex: 1, overflow: 'hidden', position: 'relative', padding: '16px' }}>
+            <div style={{ position: 'absolute', top: 16, left: 16, zIndex: 10, background: '#e6f0ff', color: '#1d4ed8', padding: '4px 12px', borderRadius: '16px', fontSize: '0.75rem', fontWeight: 600 }}>Preview</div>
+            
+            <div style={{ width: '100%', height: '100%', border: '1px dashed #cbd5e1', borderRadius: '8px', overflow: 'hidden', position: 'relative', display: 'flex', justifyContent: 'center', alignItems: 'center', backgroundImage: 'radial-gradient(#e2e8f0 1px, transparent 1px)', backgroundSize: '10px 10px' }}>
+              {renderDocumentPreview()}
+            </div>
+          </div>
+          
+          <div style={{ padding: '16px', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#ffffff' }}>
+            <button style={{ padding: '8px 16px', border: '1px solid #cbd5e1', borderRadius: '20px', background: '#ffffff', color: '#1d4ed8', fontWeight: 600, fontSize: '0.85rem', cursor: 'pointer' }}>Upload File</button>
+            <div style={{ display: 'flex', gap: '12px' }}>
+              <button style={{ padding: '8px 24px', border: '1px solid #e2e8f0', borderRadius: '6px', background: '#f8fafc', color: '#0f172a', fontWeight: 600, fontSize: '0.85rem', cursor: 'pointer' }}>Save ⓘ</button>
+              <button style={{ padding: '8px 24px', border: 'none', borderRadius: '6px', background: '#2563eb', color: '#ffffff', fontWeight: 600, fontSize: '0.85rem', cursor: 'pointer' }}>Save & Generate PDF ⓘ</button>
+            </div>
+          </div>
+          
+        </div>
+
       </div>
     </div>
   );

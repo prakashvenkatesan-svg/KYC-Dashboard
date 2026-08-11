@@ -64,7 +64,7 @@ export default function Dashboard() {
         }
       })
       .catch(error => {
-        console.error(error);
+        // Silently handle the 404 error if the backend doesn't support this endpoint yet
         setReportError(true);
       });
   }, [isAdmin]);

@@ -167,7 +167,7 @@ export default function Clients() {
           setActionModal({ isOpen: false, type: '', client: null });
         } else { setActionError('❌ Payment skip failed.'); }
       } else if (actionModal.type === 'step_back') {
-        const payload = { remarks: actionRemarks, moved_by: user.name, user_role: user.role, action_type: 'step_back', new_stage: actionStage, application_id: appId, client_code: clientCode };
+        const payload = { remarks: actionRemarks, moved_by: user.name, user_role: user.role, action_type: 'step_back', new_step: actionStage, application_id: appId, client_code: clientCode };
         let success = false;
         if (clientCode) { const res = await api.put(`/clients/${encodeURIComponent(clientCode)}/stages`, payload).catch(()=>null); if (res?.success) success = true; }
         if (!success) { const res = await api.put(`/kyc-applications/${appId}/stages`, payload).catch(()=>null); if (res?.success) success = true; }

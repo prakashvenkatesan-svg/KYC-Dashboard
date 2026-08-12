@@ -1,6 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import api from '../api';
+import * as XLSX from 'xlsx';
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
 
 const ALL_COLUMNS = {
   application_date: { label: 'APPLICATION DATE', mandatory: true },
@@ -110,6 +113,8 @@ export default function Clients() {
   const [actionRemarks, setActionRemarks] = useState('');
   const [actionStage, setActionStage] = useState('');
   const [actionError, setActionError] = useState('');
+  const [exportMenuOpen, setExportMenuOpen] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
 
   useEffect(() => {
     const handleClickOutside = () => setOpenActionMenuId(null);
@@ -269,6 +274,92 @@ export default function Clients() {
 
   const activeCols = columnOrder.filter(col => visibleColumns.includes(col) || ALL_COLUMNS[col].mandatory);
 
+  const handleExport = async (format) => {
+    setIsExporting(true);
+    try {
+      const params = {
+        q: search,
+        sortBy,
+        sortOrder,
+        isExport: 'true'
+      };
+      
+      if (integration) params.integration = integration;
+      if (status) params.status = status;
+      if (currentStage) params.currentStage = currentStage;
+      if (kycStatusParam) params.kyc_status = kycStatusParam;
+      if (fromDate && toDate) {
+        params.fromDate = fromDate;
+        params.toDate = toDate;
+      }
+
+      const res = await api.getClients(params);
+      const data = res.data || [];
+      
+      if (!data.length) {
+        alert('No records found to export.');
+        return;
+      }
+
+      const exportCols = activeCols.filter(c => c !== 'action');
+      const headers = exportCols.map(c => ALL_COLUMNS[c].label);
+      
+      const rows = data.map(client => {
+        return exportCols.map(col => {
+          let content = client[col] || 'N/A';
+          if (col === 'application_date') content = client.application_date ? new Date(client.application_date).toLocaleDateString('en-GB') : 'N/A';
+          if (col === 'current_stage') content = formatCurrentStage(client.current_stage);
+          if (['nse', 'bse', 'cvlkra', 'cdsl', 'techexcel'].includes(col)) {
+             content = client[`${col}_push_status`] || client[`${col}_sync_status`] || 'Not Started';
+          }
+          if (col.endsWith('_reason')) {
+             content = client[`${col.replace('_reason', '')}_rejection_reason`] || '-';
+          }
+          if (col === 'esign_pdf') content = 'Available';
+          
+          return content;
+        });
+      });
+
+      const dateStr = new Date().toISOString().slice(0, 10);
+
+      if (format === 'csv') {
+        const csvContent = [headers, ...rows].map(e => e.map(item => `"${String(item).replace(/"/g, '""')}"`).join(",")).join("\n");
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement("a");
+        const url = URL.createObjectURL(blob);
+        link.setAttribute("href", url);
+        link.setAttribute("download", `Clients_Export_${dateStr}.csv`);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      } else if (format === 'excel') {
+        const worksheet = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, "Clients");
+        XLSX.writeFile(workbook, `Clients_Export_${dateStr}.xlsx`);
+      } else if (format === 'pdf') {
+        const doc = new jsPDF({ orientation: 'landscape' });
+        doc.text("Clients Export", 14, 15);
+        doc.autoTable({
+          head: [headers],
+          body: rows,
+          startY: 20,
+          styles: { fontSize: 8 },
+          headStyles: { fillColor: [41, 128, 185] }
+        });
+        doc.save(`Clients_Export_${dateStr}.pdf`);
+      }
+
+    } catch (err) {
+      console.error(err);
+      alert('Failed to export data.');
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   return (
     <div className="table-container">
       <div className="controls" style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center', marginBottom: '20px' }}>
@@ -318,9 +409,18 @@ export default function Clients() {
         <input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} style={{ padding: '8px', borderRadius: '6px', border: '1px solid var(--border-color)', background: 'var(--bg-color)', color: 'var(--text-color)' }} />
         <input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} style={{ padding: '8px', borderRadius: '6px', border: '1px solid var(--border-color)', background: 'var(--bg-color)', color: 'var(--text-color)' }} />
         
-        <button style={{ border: '1px solid var(--border-color)', background: 'var(--primary-color)', color: 'white', borderRadius: '6px', padding: '8px 16px', cursor: 'pointer', fontWeight: 500 }}>
-          Export ⭳
-        </button>
+        <div style={{ position: 'relative' }}>
+          <button onClick={() => setExportMenuOpen(!exportMenuOpen)} disabled={isExporting} style={{ border: '1px solid var(--border-color)', background: 'var(--primary-color)', color: 'white', borderRadius: '6px', padding: '8px 16px', cursor: 'pointer', fontWeight: 500 }}>
+            {isExporting ? '⏳ Exporting...' : 'Export ⭳'}
+          </button>
+          {exportMenuOpen && (
+            <div style={{ position: 'absolute', top: '100%', right: 0, marginTop: '4px', background: 'var(--surface-color)', border: '1px solid var(--border-color)', borderRadius: '6px', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', zIndex: 100, minWidth: '120px' }}>
+              <button onClick={() => { setExportMenuOpen(false); handleExport('csv'); }} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '8px 16px', background: 'transparent', border: 'none', color: 'var(--text-color)', cursor: 'pointer' }}>CSV</button>
+              <button onClick={() => { setExportMenuOpen(false); handleExport('excel'); }} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '8px 16px', background: 'transparent', border: 'none', color: 'var(--text-color)', cursor: 'pointer' }}>Excel</button>
+              <button onClick={() => { setExportMenuOpen(false); handleExport('pdf'); }} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '8px 16px', background: 'transparent', border: 'none', color: 'var(--text-color)', cursor: 'pointer' }}>PDF</button>
+            </div>
+          )}
+        </div>
       </div>
       
       <div className="table-wrapper" style={{ overflowX: 'auto', maxWidth: '100%', border: '1px solid var(--border-color)', borderRadius: '8px' }}>

@@ -71,5 +71,8 @@ router.post("/kyc-applications/:applicationId/step-back", verifyTokenMiddleware,
 router.put("/kyc-applications/:applicationId/step-back", verifyTokenMiddleware, requireAdminMiddleware, stepBackAction);
 router.post("/kyc-applications/:applicationId/stages", verifyTokenMiddleware, requireAdminMiddleware, changeStepAction);
 router.put("/kyc-applications/:applicationId/stages", verifyTokenMiddleware, requireAdminMiddleware, changeStepAction);
+router.post("/clients/:clientCode/stages", verifyTokenMiddleware, requireAdminMiddleware, changeStepAction);
+router.put("/clients/:clientCode/stages", verifyTokenMiddleware, requireAdminMiddleware, changeStepAction);
+
 
 module.exports = router;

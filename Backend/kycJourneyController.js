@@ -11,7 +11,8 @@ const STEP_SEQUENCE = [
   'live_photo',
   'signature_upload',
   'payment_summary',
-  'esign'
+  'esign',
+  'completed'
 ];
 
 const STEP_ALIASES = {
@@ -42,12 +43,14 @@ const STEP_ALIASES = {
   'signature_upload': 'signature_upload',
   'payment summary': 'payment_summary',
   'scheme selection': 'payment_summary',
+  'scheme_details': 'payment_summary',
   'payment': 'payment_summary',
   'payment_summary': 'payment_summary',
   'pdf generation': 'pdf_generation',
   'pdf_generation': 'pdf_generation',
   'esign': 'esign',
-  'e sign': 'esign'
+  'e sign': 'esign',
+  'completed': 'completed'
 };
 
 const STEP_TO_STAGE_CODE = {

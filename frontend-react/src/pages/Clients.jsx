@@ -281,7 +281,8 @@ export default function Clients() {
         q: search,
         sortBy,
         sortOrder,
-        isExport: 'true'
+        isExport: 'true',
+        limit: 50000
       };
       
       if (integration) params.integration = integration;

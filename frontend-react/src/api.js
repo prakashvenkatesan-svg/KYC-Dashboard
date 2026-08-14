@@ -328,6 +328,28 @@ const api = {
     if (!res.ok) throw new Error('Failed to fetch payments');
     return res.json();
   },
+  getBetaEntries: async (params = {}) => {
+    const qs = new URLSearchParams(params).toString();
+    const res = await fetch(`${API_BASE_URL}/beta/entries?${qs}`, { headers: getAuthHeaders() });
+    if (res.status === 401) {
+      localStorage.removeItem('kyc_auth_token');
+      window.location.href = '/login';
+      return;
+    }
+    if (res.status === 403) {
+      return { success: false, forbidden: true, message: 'Admin access required' };
+    }
+    if (!res.ok) throw new Error('Failed to fetch beta entries');
+    return res.json();
+  },
+  pushBetaEntry: async (payload) => {
+    const res = await fetch(`${API_BASE_URL}/beta/push`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(payload)
+    });
+    return parseApiResponse(res, 'Push request completed.');
+  },
   
   // Generic methods for User Management (and others)
   get: async (path) => {

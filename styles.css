@@ -488,6 +488,150 @@ body {
   color: var(--text-secondary);
 }
 
+.beta-filter-panel {
+  background: var(--surface-color);
+  border: 1px solid var(--surface-border);
+  border-radius: 14px;
+  padding: 16px;
+  margin-bottom: 18px;
+}
+
+.beta-filter-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.beta-filter-grid label {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  color: var(--text-secondary);
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.beta-filter-grid input,
+.beta-filter-grid select,
+.beta-section-filter {
+  width: 100%;
+  background: var(--input-bg);
+  border: 1px solid var(--surface-border);
+  color: var(--text-primary);
+  border-radius: 8px;
+  padding: 10px 12px;
+  font: inherit;
+  font-size: 0.9rem;
+}
+
+.beta-actions-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.beta-primary-btn,
+.beta-secondary-btn,
+.beta-push-actions button {
+  border: 1px solid var(--surface-border);
+  border-radius: 8px;
+  color: var(--text-primary);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 700;
+  padding: 9px 12px;
+}
+
+.beta-primary-btn {
+  background: var(--primary-color);
+  border-color: var(--primary-color);
+  color: white;
+}
+
+.beta-secondary-btn,
+.beta-push-actions button {
+  background: var(--subtle-surface);
+}
+
+.beta-primary-btn:hover,
+.beta-secondary-btn:hover,
+.beta-push-actions button:hover:not(:disabled) {
+  border-color: rgba(129, 140, 248, 0.55);
+  color: #C7D2FE;
+}
+
+.beta-push-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  min-width: 120px;
+}
+
+.beta-push-actions button {
+  padding: 7px 9px;
+  text-align: left;
+}
+
+.beta-push-actions button:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+.beta-section {
+  margin-bottom: 20px;
+}
+
+.beta-section-filter {
+  max-width: 260px;
+}
+
+.beta-table {
+  min-width: 1500px;
+}
+
+.beta-table th,
+.beta-table td {
+  font-size: 0.86rem;
+}
+
+.beta-muted {
+  color: var(--text-secondary);
+  font-size: 0.76rem;
+  margin-top: 5px;
+  max-width: 220px;
+  white-space: normal;
+  word-break: break-word;
+}
+
+.beta-alert {
+  background: var(--panel-surface);
+  border: 1px solid var(--surface-border);
+  border-radius: 12px;
+  margin-bottom: 18px;
+  padding: 12px 14px;
+  color: var(--text-primary);
+}
+
+.beta-alert.success {
+  border-color: rgba(16, 185, 129, 0.45);
+  background: rgba(16, 185, 129, 0.12);
+}
+
+.beta-alert.failed {
+  border-color: rgba(239, 68, 68, 0.45);
+  background: rgba(239, 68, 68, 0.12);
+}
+
+.beta-alert pre {
+  margin-top: 10px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+}
+
 /* Dashboard Metrics Grid */
 .metrics-grid {
   display: grid;

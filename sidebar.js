@@ -45,6 +45,9 @@ const sidebarHTML = `
       <a href="clients.html" class="nav-link" id="nav-clients">
         <i class="icon">&#128101;</i> Clients
       </a>
+      <a href="beta.html" class="nav-link" id="nav-beta">
+        <i class="icon" style="font-style:normal;">&#946;</i> Beta
+      </a>
       <a href="payments.html" class="nav-link" id="nav-payments">
         <i class="icon" style="font-style:normal;">&#128179;</i> Payments
       </a>
@@ -116,6 +119,7 @@ function renderSidebar() {
       if (user.role !== 'Admin') {
         if (!mods.includes('Dashboard')) document.getElementById('nav-dashboard').style.display = 'none';
         if (!mods.includes('Clients')) document.getElementById('nav-clients').style.display = 'none';
+        if (document.getElementById('nav-beta')) document.getElementById('nav-beta').style.display = 'none';
         if (!mods.includes('Payments')) document.getElementById('nav-payments').style.display = 'none';
         if (!mods.includes('NSE')) document.getElementById('nav-nse').style.display = 'none';
         if (!mods.includes('BSE')) document.getElementById('nav-bse').style.display = 'none';
@@ -222,6 +226,8 @@ function renderSidebar() {
     } else if (linkHref === 'users.html' && path.includes('users.html')) {
       link.classList.add('active');
     } else if (linkHref === 'clients.html' && path.includes('clients.html') && !link.dataset.kycStatus) {
+      link.classList.add('active');
+    } else if (linkHref === 'beta.html' && path.includes('beta.html')) {
       link.classList.add('active');
     } else if (linkHref === 'nse.html' && path.includes('nse.html')) {
       link.classList.add('active');

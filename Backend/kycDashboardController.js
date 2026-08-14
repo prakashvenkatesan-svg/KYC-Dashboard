@@ -794,6 +794,359 @@ const getSystemAuditLogs = async (req, res) => {
   }
 };
 
+const mapBetaFlowType = (row) => {
+  if (!row) return 'Unknown';
+  if (row.has_digilocker_flow) return 'DigiLocker';
+  if (row.has_kra_flow) return 'KRA';
+  return 'Unknown';
+};
+
+const getBetaEntries = async (req, res) => {
+  try {
+    const {
+      q = "",
+      flow = "",
+      cvlkraStatus = "",
+      currentStage = "",
+      esignStatus = "",
+      completed = "",
+      limit = "200",
+      offset = "0"
+    } = req.query;
+
+    const parsedLimit = Math.min(Math.max(parseInt(limit, 10) || 200, 1), 1000);
+    const parsedOffset = Math.max(parseInt(offset, 10) || 0, 0);
+    const conditions = [];
+    const params = [];
+
+    const flowExpr = `
+      CASE
+        WHEN (
+          digi.id IS NOT NULL
+          OR LOWER(COALESCE(iv.provider, '')) = 'digilocker'
+          OR LOWER(COALESCE(digi.provider, '')) = 'digilocker'
+          OR COALESCE(cvl.app_kyc_mode, '') = '5'
+          OR COALESCE(cvl.aadhaar_xml_s3_key, '') <> ''
+        ) THEN 'DigiLocker'
+        WHEN cvl.id IS NOT NULL THEN 'KRA'
+        ELSE 'Unknown'
+      END
+    `;
+
+    if (q.trim()) {
+      params.push(`%${q.trim()}%`);
+      conditions.push(`(
+        COALESCE(ka.client_code, cc.client_code, tech."Client_id", '') ILIKE $${params.length}
+        OR COALESCE(iv.pan_number, cvl.app_pan_no, tech."PAN_NO", '') ILIKE $${params.length}
+        OR COALESCE(iv.full_name, digi.name, cvl.app_name, tech."Client_Name", '') ILIKE $${params.length}
+        OR COALESCE(cd.email, '') ILIKE $${params.length}
+        OR COALESCE(cd.mobile_number, '') ILIKE $${params.length}
+      )`);
+    }
+
+    if (flow.trim()) {
+      params.push(flow.trim());
+      conditions.push(`${flowExpr} = $${params.length}`);
+    }
+
+    if (cvlkraStatus.trim()) {
+      params.push(`%${cvlkraStatus.trim()}%`);
+      conditions.push(`COALESCE(cvl.sync_status, '') ILIKE $${params.length}`);
+    }
+
+    if (currentStage.trim()) {
+      params.push(`%${currentStage.trim()}%`);
+      conditions.push(`COALESCE(ka.current_step, '') ILIKE $${params.length}`);
+    }
+
+    if (esignStatus.trim()) {
+      params.push(`%${esignStatus.trim()}%`);
+      conditions.push(`COALESCE(ka.esign_status, '') ILIKE $${params.length}`);
+    }
+
+    if (completed.trim()) {
+      const value = completed.trim().toLowerCase();
+      if (['true', 'false'].includes(value)) {
+        params.push(value === 'true');
+        conditions.push(`ka.is_completed = $${params.length}`);
+      }
+    }
+
+    const baseFrom = `
+      FROM public.kyc_applications ka
+      LEFT JOIN public.contact_details cd ON cd.application_id = ka.id
+      LEFT JOIN LATERAL (
+        SELECT client_code
+        FROM public.client_codes
+        WHERE email = cd.email
+        ORDER BY updated_at DESC NULLS LAST, id DESC
+        LIMIT 1
+      ) cc ON true
+      LEFT JOIN public.identity_verifications iv ON iv.application_id = ka.id
+      LEFT JOIN public.digilocker_details digi ON digi.application_id = ka.id::text
+      LEFT JOIN LATERAL (
+        SELECT *
+        FROM public.cvlkra_data
+        WHERE application_id = ka.id
+        ORDER BY updated_at DESC NULLS LAST, id DESC
+        LIMIT 1
+      ) cvl ON true
+      LEFT JOIN LATERAL (
+        SELECT *
+        FROM public.cdsl_data
+        WHERE application_id = ka.id
+        ORDER BY updated_at DESC NULLS LAST, id DESC
+        LIMIT 1
+      ) cdsl ON true
+      LEFT JOIN LATERAL (
+        SELECT *
+        FROM public.nse_data
+        WHERE application_id = ka.id
+        ORDER BY updated_at DESC NULLS LAST, id DESC
+        LIMIT 1
+      ) nse ON true
+      LEFT JOIN LATERAL (
+        SELECT *
+        FROM public.bse_data
+        WHERE application_id = ka.id
+        ORDER BY updated_at DESC NULLS LAST, id DESC
+        LIMIT 1
+      ) bse ON true
+      LEFT JOIN LATERAL (
+        SELECT *
+        FROM public.techexcel
+        WHERE "Client_id" = COALESCE(ka.client_code, cc.client_code)
+        ORDER BY updated_at DESC NULLS LAST
+        LIMIT 1
+      ) tech ON true
+    `;
+
+    const whereClause = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+
+    const dataQuery = `
+      SELECT
+        ka.id AS application_id,
+        COALESCE(NULLIF(ka.client_code, ''), NULLIF(cc.client_code, ''), NULLIF(tech."Client_id", '')) AS client_code,
+        COALESCE(NULLIF(iv.pan_number, ''), NULLIF(cvl.app_pan_no, ''), NULLIF(tech."PAN_NO", '')) AS pan,
+        COALESCE(NULLIF(iv.full_name, ''), NULLIF(digi.name, ''), NULLIF(cvl.app_name, ''), NULLIF(tech."Client_Name", '')) AS client_name,
+        cd.email,
+        cd.mobile_number,
+        ka.current_step,
+        ka.esign_status,
+        ka.is_completed,
+        ka.is_test_entry,
+        ${flowExpr} AS flow_type,
+        (${flowExpr} = 'DigiLocker') AS has_digilocker_flow,
+        (${flowExpr} = 'KRA') AS has_kra_flow,
+        cvl.id AS cvlkra_id,
+        cvl.sync_status AS cvlkra_status,
+        cvl.error_description AS cvlkra_error,
+        cvl.cvlkra_acknowledgment_id,
+        cvl.aadhaar_xml_s3_key,
+        CASE
+          WHEN COALESCE(cvl.aadhaar_xml_s3_key, '') <> '' THEN 'Stored'
+          WHEN COALESCE(digi.digilocker_raw_xml, '') <> '' THEN 'Raw XML in DB'
+          ELSE 'Missing'
+        END AS xml_status,
+        cdsl.id AS cdsl_id,
+        cdsl.cdsl_push_status,
+        cdsl.bo_id,
+        cdsl.cdsl_msg_desc,
+        nse.id AS nse_id,
+        nse.nse_push_status,
+        nse.nse_msg_desc,
+        bse.id AS bse_id,
+        bse.bse_status,
+        bse.client_code AS bse_client_code,
+        tech."Client_id" AS techexcel_client_id,
+        tech.techexcel_push_status,
+        GREATEST(
+          COALESCE(ka.updated_at, ka.created_at),
+          COALESCE(cvl.updated_at, cvl.created_at),
+          COALESCE(cdsl.updated_at, cdsl.created_at),
+          COALESCE(nse.updated_at, nse.created_at),
+          COALESCE(bse.updated_at, bse.created_at)
+        ) AS updated_at
+      ${baseFrom}
+      ${whereClause}
+      ORDER BY updated_at DESC NULLS LAST, ka.id DESC
+      LIMIT $${params.length + 1} OFFSET $${params.length + 2}
+    `;
+
+    const countQuery = `
+      SELECT
+        COUNT(*) AS total,
+        COUNT(*) FILTER (WHERE ${flowExpr} = 'KRA') AS kra_flow_count,
+        COUNT(*) FILTER (WHERE ${flowExpr} = 'DigiLocker') AS digilocker_flow_count,
+        COUNT(*) FILTER (WHERE ka.esign_status = 'completed') AS esign_completed_count
+      ${baseFrom}
+      ${whereClause}
+    `;
+
+    const [dataResult, countResult] = await Promise.all([
+      pool.query(dataQuery, [...params, parsedLimit, parsedOffset]),
+      pool.query(countQuery, params)
+    ]);
+
+    const data = dataResult.rows.map(row => ({
+      ...row,
+      flow_type: mapBetaFlowType(row),
+      cvlkra_status: normalizeStatus(row.cvlkra_status),
+      cdsl_push_status: normalizeStatus(row.cdsl_push_status),
+      nse_push_status: normalizeStatus(row.nse_push_status),
+      bse_status: normalizeStatus(row.bse_status),
+      techexcel_push_status: normalizeStatus(row.techexcel_push_status)
+    }));
+
+    return res.status(200).json({
+      success: true,
+      data,
+      summary: {
+        total: parseInt(countResult.rows[0]?.total, 10) || 0,
+        kra_flow_count: parseInt(countResult.rows[0]?.kra_flow_count, 10) || 0,
+        digilocker_flow_count: parseInt(countResult.rows[0]?.digilocker_flow_count, 10) || 0,
+        esign_completed_count: parseInt(countResult.rows[0]?.esign_completed_count, 10) || 0
+      },
+      pagination: {
+        limit: parsedLimit,
+        offset: parsedOffset,
+        total: parseInt(countResult.rows[0]?.total, 10) || 0
+      }
+    });
+  } catch (error) {
+    console.error("Get beta entries error:", error);
+    return res.status(500).json({ success: false, message: "Server error while fetching beta entries", error: error.message });
+  }
+};
+
+const postJson = (urlString, payload) => {
+  const http = require('http');
+  const https = require('https');
+  const url = new URL(urlString);
+  const body = JSON.stringify(payload);
+  const client = url.protocol === 'http:' ? http : https;
+
+  return new Promise((resolve, reject) => {
+    const request = client.request({
+      method: 'POST',
+      hostname: url.hostname,
+      port: url.port || (url.protocol === 'http:' ? 80 : 443),
+      path: `${url.pathname}${url.search}`,
+      headers: {
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(body)
+      },
+      timeout: 30000
+    }, response => {
+      const chunks = [];
+      response.on('data', chunk => chunks.push(chunk));
+      response.on('end', () => {
+        const text = Buffer.concat(chunks).toString('utf8');
+        let parsed = text;
+        try {
+          parsed = JSON.parse(text);
+        } catch (error) {}
+        resolve({ statusCode: response.statusCode, body: parsed });
+      });
+    });
+
+    request.on('timeout', () => {
+      request.destroy(new Error('Push request timed out.'));
+    });
+    request.on('error', reject);
+    request.write(body);
+    request.end();
+  });
+};
+
+const getBetaPushTarget = (target) => {
+  const normalized = String(target || '').trim().toLowerCase();
+  const urls = {
+    orchestrator: process.env.BETA_ORCHESTRATOR_URL || process.env.ORCHESTRATOR_URL,
+    cvlkra: process.env.BETA_CVLKRA_URL || process.env.CVLKRA_CONNECT_URL,
+    cvlkra_document: process.env.BETA_CVLKRA_URL || process.env.CVLKRA_CONNECT_URL,
+    cdsl: process.env.BETA_CDSL_URL || process.env.CDSL_KYC_URL,
+    nse: process.env.BETA_NSE_URL || process.env.NSE_CONNECT_URL,
+    bse: process.env.BETA_BSE_URL || process.env.BSE_CONNECT_URL,
+    techexcel: process.env.BETA_TECHEXCEL_URL || process.env.TECHEXCEL_CONNECT_URL
+  };
+
+  return {
+    normalized,
+    url: urls[normalized]
+  };
+};
+
+const buildDefaultBetaPushPayload = ({ target, applicationId, pan }) => {
+  if (target === 'cvlkra') {
+    return pan ? { pans: [pan], limit: 1 } : { applicationIds: [applicationId], limit: 1 };
+  }
+
+  if (target === 'cvlkra_document') {
+    return {
+      mode: 'documentUploadOnly',
+      applicationId,
+      reconcileFinalStatus: true
+    };
+  }
+
+  if (target === 'orchestrator') {
+    return {
+      mode: 'process',
+      applicationIds: [applicationId],
+      limit: 1
+    };
+  }
+
+  return {
+    mode: 'process',
+    applicationIds: [applicationId],
+    pans: pan ? [pan] : [],
+    limit: 1
+  };
+};
+
+const pushBetaEntry = async (req, res) => {
+  try {
+    const { target, applicationId, pan, payload } = req.body || {};
+    const appId = parseInt(applicationId, 10);
+
+    if (!target || !appId) {
+      return res.status(400).json({ success: false, message: "target and applicationId are required." });
+    }
+
+    const { normalized, url } = getBetaPushTarget(target);
+    const allowedTargets = ['orchestrator', 'cvlkra', 'cvlkra_document', 'cdsl', 'nse', 'bse', 'techexcel'];
+    if (!allowedTargets.includes(normalized)) {
+      return res.status(400).json({ success: false, message: "Unsupported push target." });
+    }
+
+    const finalPayload = payload && typeof payload === 'object'
+      ? payload
+      : buildDefaultBetaPushPayload({ target: normalized, applicationId: appId, pan });
+
+    if (!url) {
+      return res.status(501).json({
+        success: false,
+        message: `Push target ${normalized} is not configured. Set the matching BETA_*_URL environment variable.`,
+        target: normalized,
+        payload: finalPayload
+      });
+    }
+
+    const response = await postJson(url, finalPayload);
+    return res.status(200).json({
+      success: response.statusCode >= 200 && response.statusCode < 300,
+      target: normalized,
+      requestPayload: finalPayload,
+      response
+    });
+  } catch (error) {
+    console.error("Beta push error:", error);
+    return res.status(500).json({ success: false, message: "Server error while pushing beta entry", error: error.message });
+  }
+};
+
 module.exports = {
   getDashboardSummary,
   getClients,
@@ -804,5 +1157,7 @@ module.exports = {
   getPayments,
   editClientField,
   getStageTimestamps,
-  getSystemAuditLogs
+  getSystemAuditLogs,
+  getBetaEntries,
+  pushBetaEntry
 };

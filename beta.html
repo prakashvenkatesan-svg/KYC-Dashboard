@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Beta - KYC Operations</title>
+  <link rel="stylesheet" href="styles.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="layout">
+    <div id="sidebar-container"></div>
+    <main class="main-content">
+      <header class="top-header">
+        <h1 id="page-title">Beta Push Desk</h1>
+        <div class="user-profile" style="display:flex; align-items:center; gap: 10px;">
+          <button id="theme-toggle" class="theme-toggle" type="button" aria-label="Switch to light mode">Light Mode</button>
+          <span id="logged-in-user">Loading...</span>
+          <button id="logout-btn" style="background:transparent; border:1px solid var(--surface-border); color:var(--text-primary); cursor:pointer; padding: 4px 8px; border-radius:4px;">Logout</button>
+        </div>
+      </header>
+
+      <div class="dashboard-content beta-page">
+        <p class="subtitle">Admin-only view for PAN, client code, flow classification, and controlled push actions.</p>
+
+        <section class="beta-filter-panel">
+          <div class="beta-filter-grid">
+            <label>
+              Search
+              <input id="beta-search" type="search" placeholder="PAN, client code, name, email, mobile">
+            </label>
+            <label>
+              Flow
+              <select id="beta-flow">
+                <option value="">All flows</option>
+                <option value="KRA">KRA flow only</option>
+                <option value="DigiLocker">DigiLocker flow only</option>
+                <option value="Unknown">Unknown</option>
+              </select>
+            </label>
+            <label>
+              CVL KRA Status
+              <input id="beta-cvlkra-status" type="text" placeholder="Pending, Uploaded, Rejected">
+            </label>
+            <label>
+              Stage
+              <input id="beta-stage" type="text" placeholder="completed, esign">
+            </label>
+            <label>
+              eSign
+              <select id="beta-esign">
+                <option value="">Any</option>
+                <option value="completed">Completed</option>
+                <option value="pending">Pending</option>
+              </select>
+            </label>
+            <label>
+              Completed
+              <select id="beta-completed">
+                <option value="">Any</option>
+                <option value="true">Yes</option>
+                <option value="false">No</option>
+              </select>
+            </label>
+          </div>
+          <div class="beta-actions-row">
+            <button class="beta-primary-btn" id="beta-apply">Apply Filter</button>
+            <button class="beta-secondary-btn" id="beta-reset">Reset</button>
+            <button class="beta-secondary-btn" id="beta-copy-kra-pans">Copy KRA PANs</button>
+          </div>
+        </section>
+
+        <section id="beta-alert" class="beta-alert" style="display:none;"></section>
+
+        <section class="push-kpi-grid" id="beta-summary">
+          <div class="loading">Loading beta entries...</div>
+        </section>
+
+        <section class="needs-attention-panel beta-section" data-flow-section="KRA">
+          <div class="section-heading-row compact">
+            <div>
+              <h2>KRA Flow</h2>
+              <p>Rows without DigiLocker evidence. Use this list when you need only PANs from KRA flow.</p>
+            </div>
+            <input class="beta-section-filter" id="beta-kra-local-filter" type="search" placeholder="Filter this section">
+          </div>
+          <div class="operations-table-wrapper">
+            <table class="operations-table beta-table">
+              <thead>
+                <tr>
+                  <th>PAN</th>
+                  <th>CC</th>
+                  <th>Application</th>
+                  <th>Name</th>
+                  <th>Stage</th>
+                  <th>CVL KRA</th>
+                  <th>CDSL</th>
+                  <th>NSE</th>
+                  <th>BSE</th>
+                  <th>TechExcel</th>
+                  <th>XML</th>
+                  <th>Push</th>
+                </tr>
+              </thead>
+              <tbody id="beta-kra-body">
+                <tr><td colspan="12">Loading...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="needs-attention-panel beta-section" data-flow-section="DigiLocker">
+          <div class="section-heading-row compact">
+            <div>
+              <h2>DigiLocker Flow</h2>
+              <p>Rows with DigiLocker evidence, KYC mode 5, or stored Aadhaar XML key.</p>
+            </div>
+            <input class="beta-section-filter" id="beta-digi-local-filter" type="search" placeholder="Filter this section">
+          </div>
+          <div class="operations-table-wrapper">
+            <table class="operations-table beta-table">
+              <thead>
+                <tr>
+                  <th>PAN</th>
+                  <th>CC</th>
+                  <th>Application</th>
+                  <th>Name</th>
+                  <th>Stage</th>
+                  <th>CVL KRA</th>
+                  <th>CDSL</th>
+                  <th>NSE</th>
+                  <th>BSE</th>
+                  <th>TechExcel</th>
+                  <th>XML</th>
+                  <th>Push</th>
+                </tr>
+              </thead>
+              <tbody id="beta-digi-body">
+                <tr><td colspan="12">Loading...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <script src="api.js"></script>
+  <script src="sidebar.js"></script>
+  <script src="beta.js"></script>
+</body>
+</html>

@@ -44,6 +44,15 @@ const text = (value) => {
   return String(value);
 };
 
+const statusCell = (integration) => (
+  <>
+    {badge(integration?.status)}
+    <div style={{ maxWidth: 220, color: 'var(--text-muted)', fontSize: '0.75rem' }}>
+      {text(integration?.error)}
+    </div>
+  </>
+);
+
 const includesText = (row, query) => {
   if (!query) return true;
   const needle = query.toLowerCase();
@@ -111,11 +120,11 @@ function BetaTable({ title, description, rows, localFilter, onLocalFilter, onPus
                 <td>{text(row.application_id)}</td>
                 <td>{text(row.client_name)}</td>
                 <td>{text(row.current_step)}</td>
-                <td>{badge(row.cvlkra?.status)}<div style={{ maxWidth: 220, color: 'var(--text-muted)', fontSize: '0.75rem' }}>{text(row.cvlkra?.error)}</div></td>
-                <td>{badge(row.cdsl?.status)}</td>
-                <td>{badge(row.nse?.status)}</td>
-                <td>{badge(row.bse?.status)}</td>
-                <td>{badge(row.techexcel?.status)}</td>
+                <td>{statusCell(row.cvlkra)}</td>
+                <td>{statusCell(row.cdsl)}</td>
+                <td>{statusCell(row.nse)}</td>
+                <td>{statusCell(row.bse)}</td>
+                <td>{statusCell(row.techexcel)}</td>
                 <td>{badge(row.xml_status)}</td>
                 <td>
                   <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>

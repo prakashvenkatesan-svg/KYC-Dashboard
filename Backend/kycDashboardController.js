@@ -808,8 +808,6 @@ const getBetaEntries = async (req, res) => {
       flow = "",
       cvlkraStatus = "",
       currentStage = "",
-      esignStatus = "",
-      completed = "",
       limit = "200",
       offset = "0"
     } = req.query;
@@ -818,6 +816,8 @@ const getBetaEntries = async (req, res) => {
     const parsedOffset = Math.max(parseInt(offset, 10) || 0, 0);
     const conditions = [];
     const params = [];
+
+    conditions.push(`ka.is_completed = true`);
 
     const flowExpr = `
       CASE
@@ -857,19 +857,6 @@ const getBetaEntries = async (req, res) => {
     if (currentStage.trim()) {
       params.push(`%${currentStage.trim()}%`);
       conditions.push(`COALESCE(ka.current_step, '') ILIKE $${params.length}`);
-    }
-
-    if (esignStatus.trim()) {
-      params.push(`%${esignStatus.trim()}%`);
-      conditions.push(`COALESCE(ka.esign_status, '') ILIKE $${params.length}`);
-    }
-
-    if (completed.trim()) {
-      const value = completed.trim().toLowerCase();
-      if (['true', 'false'].includes(value)) {
-        params.push(value === 'true');
-        conditions.push(`ka.is_completed = $${params.length}`);
-      }
     }
 
     const baseFrom = `
@@ -978,7 +965,7 @@ const getBetaEntries = async (req, res) => {
         COUNT(*) AS total,
         COUNT(*) FILTER (WHERE ${flowExpr} = 'KRA') AS kra_flow_count,
         COUNT(*) FILTER (WHERE ${flowExpr} = 'DigiLocker') AS digilocker_flow_count,
-        COUNT(*) FILTER (WHERE ka.esign_status = 'completed') AS esign_completed_count
+        COUNT(*) FILTER (WHERE ka.is_completed = true) AS completed_count
       ${baseFrom}
       ${whereClause}
     `;
@@ -1005,7 +992,7 @@ const getBetaEntries = async (req, res) => {
         total: parseInt(countResult.rows[0]?.total, 10) || 0,
         kra_flow_count: parseInt(countResult.rows[0]?.kra_flow_count, 10) || 0,
         digilocker_flow_count: parseInt(countResult.rows[0]?.digilocker_flow_count, 10) || 0,
-        esign_completed_count: parseInt(countResult.rows[0]?.esign_completed_count, 10) || 0
+        completed_count: parseInt(countResult.rows[0]?.completed_count, 10) || 0
       },
       pagination: {
         limit: parsedLimit,

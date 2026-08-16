@@ -5,9 +5,7 @@ const blankFilters = {
   q: '',
   flow: '',
   cvlkraStatus: '',
-  currentStage: '',
-  esignStatus: 'completed',
-  completed: 'true'
+  currentStage: ''
 };
 
 const blockedPushPans = new Set([
@@ -494,7 +492,7 @@ export default function Beta() {
     setLoading(true);
     setMessage('');
     try {
-      const params = { ...filters, limit: 500 };
+      const params = { ...filters, completed: 'true', limit: 500 };
       Object.keys(params).forEach(key => {
         if (params[key] === '') delete params[key];
       });
@@ -729,16 +727,6 @@ export default function Beta() {
           </select>
           <input value={filters.cvlkraStatus} onChange={e => updateFilter('cvlkraStatus', e.target.value)} placeholder="CVL KRA status" />
           <input value={filters.currentStage} onChange={e => updateFilter('currentStage', e.target.value)} placeholder="Stage" />
-          <select value={filters.esignStatus} onChange={e => updateFilter('esignStatus', e.target.value)}>
-            <option value="">All eSign</option>
-            <option value="completed">eSign completed</option>
-            <option value="pending">eSign pending</option>
-          </select>
-          <select value={filters.completed} onChange={e => updateFilter('completed', e.target.value)}>
-            <option value="">All completion</option>
-            <option value="true">Completed only</option>
-            <option value="false">Incomplete only</option>
-          </select>
         </div>
         <div className="beta-actions-row">
           <button className="beta-primary-btn" onClick={loadEntries} disabled={loading}>{loading ? 'Loading...' : 'Apply Filter'}</button>
@@ -750,7 +738,7 @@ export default function Beta() {
         <div className="beta-section"><div style={{ color: 'var(--text-muted)', fontSize: '0.78rem' }}>Total</div><strong>{summary.total || entries.length}</strong></div>
         <div className="beta-section"><div style={{ color: 'var(--text-muted)', fontSize: '0.78rem' }}>KRA Flow</div><strong>{summary.kra_flow_count ?? grouped.kra.length}</strong></div>
         <div className="beta-section"><div style={{ color: 'var(--text-muted)', fontSize: '0.78rem' }}>DigiLocker Flow</div><strong>{summary.digilocker_flow_count ?? grouped.digilocker.length}</strong></div>
-        <div className="beta-section"><div style={{ color: 'var(--text-muted)', fontSize: '0.78rem' }}>eSign Completed</div><strong>{summary.esign_completed_count || 0}</strong></div>
+        <div className="beta-section"><div style={{ color: 'var(--text-muted)', fontSize: '0.78rem' }}>Completed</div><strong>{summary.completed_count ?? summary.total ?? entries.length}</strong></div>
       </div>
 
       {message ? (

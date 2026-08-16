@@ -574,21 +574,6 @@ export default function Beta() {
     }
 
     if (target === 'cdsl_status') {
-      const records = rows
-        .filter(row => row.cdsl?.id && row.cdsl?.ackId && row.cdsl?.zipFileName)
-        .map(row => ({
-          id: row.cdsl.id,
-          ackId: row.cdsl.ackId,
-          zipFileName: row.cdsl.zipFileName
-        }));
-
-      if (records.length === rows.length) {
-        return {
-          mode: 'status',
-          records
-        };
-      }
-
       return {
         mode: 'uploadedStatus',
         applicationIds,
@@ -652,25 +637,14 @@ export default function Beta() {
     setMessage(`Sending ${label}...`);
     try {
       const payload = target === 'cdsl_status'
-        ? (
-          row.cdsl?.id && row.cdsl?.ackId && row.cdsl?.zipFileName
-            ? {
-              mode: 'status',
-              records: [{
-                id: row.cdsl.id,
-                ackId: row.cdsl.ackId,
-                zipFileName: row.cdsl.zipFileName
-              }]
-            }
-            : {
-              mode: 'uploadedStatus',
-              applicationIds: [row.application_id],
-              pans: row.pan ? [row.pan] : [],
-              limit: 1,
-              minAgeMinutes: 0,
-              forceDownload: true
-            }
-        )
+        ? {
+          mode: 'uploadedStatus',
+          applicationIds: [row.application_id],
+          pans: row.pan ? [row.pan] : [],
+          limit: 1,
+          minAgeMinutes: 0,
+          forceDownload: true
+        }
         : undefined;
       const response = await api.pushBetaEntry({
         target,

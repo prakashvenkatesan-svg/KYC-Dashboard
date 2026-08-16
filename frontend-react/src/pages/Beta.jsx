@@ -136,6 +136,30 @@ const isStatusPendingLike = (status) => {
 };
 
 const getRowKey = (row) => `${row.flow_type}-${row.application_id}-${row.pan || ''}`;
+const isFinalCdslRow = (row) => isStatusSuccess(row?.cdsl?.status) || isStatusFailed(row?.cdsl?.status);
+
+const applyRowOverrides = (row, overrides) => {
+  const override = overrides[getRowKey(row)];
+  if (!override || isFinalCdslRow(row)) return row;
+
+  return {
+    ...row,
+    ...override,
+    cdsl: {
+      ...(row.cdsl || {}),
+      ...(override.cdsl || {})
+    }
+  };
+};
+
+const markCdslWaitingOverride = (row) => ({
+  cdsl: {
+    status: 'Uploaded',
+    ackId: row?.cdsl?.ackId,
+    zipFileName: row?.cdsl?.zipFileName,
+    error: 'Uploaded to CDSL; waiting for final response'
+  }
+});
 
 const pushLabel = (target) => ({
   cvlkra: 'KRA Push',
@@ -416,6 +440,7 @@ export default function Beta() {
   const [kraLocalFilter, setKraLocalFilter] = useState('');
   const [digiLocalFilter, setDigiLocalFilter] = useState('');
   const [selectedKeys, setSelectedKeys] = useState(new Set());
+  const [rowOverrides, setRowOverrides] = useState({});
 
   const updateFilter = (key, value) => {
     setFilters(current => ({ ...current, [key]: value }));
@@ -437,6 +462,14 @@ export default function Beta() {
         const validKeys = new Set(nextEntries.map(getRowKey));
         return new Set([...current].filter(key => validKeys.has(key)));
       });
+      setRowOverrides(current => {
+        const next = {};
+        nextEntries.forEach(row => {
+          const key = getRowKey(row);
+          if (current[key] && !isFinalCdslRow(row)) next[key] = current[key];
+        });
+        return next;
+      });
       if (response?.forbidden) setMessage(response.message || 'Admin access required.');
     } catch (error) {
       setMessage(error.message || 'Failed to load beta entries.');
@@ -449,11 +482,16 @@ export default function Beta() {
     loadEntries();
   }, [loadEntries]);
 
+  const displayEntries = useMemo(
+    () => entries.map(row => applyRowOverrides(row, rowOverrides)),
+    [entries, rowOverrides]
+  );
+
   const grouped = useMemo(() => {
-    const kra = entries.filter(row => row.flow_type === 'KRA');
-    const digilocker = entries.filter(row => row.flow_type === 'DigiLocker');
+    const kra = displayEntries.filter(row => row.flow_type === 'KRA');
+    const digilocker = displayEntries.filter(row => row.flow_type === 'DigiLocker');
     return { kra, digilocker };
-  }, [entries]);
+  }, [displayEntries]);
 
   const copyKraPans = async () => {
     const pans = grouped.kra.map(row => row.pan).filter(Boolean).join('\n');
@@ -567,6 +605,15 @@ export default function Beta() {
         pan: firstRow.pan,
         payload
       });
+      if (target === 'cdsl') {
+        setRowOverrides(current => {
+          const next = { ...current };
+          rows.forEach(row => {
+            next[getRowKey(row)] = markCdslWaitingOverride(row);
+          });
+          return next;
+        });
+      }
       setMessage(JSON.stringify(response, null, 2));
       await loadEntries();
     } catch (error) {
@@ -610,6 +657,12 @@ export default function Beta() {
         pan: row.pan,
         ...(payload ? { payload } : {})
       });
+      if (target === 'cdsl') {
+        setRowOverrides(current => ({
+          ...current,
+          [getRowKey(row)]: markCdslWaitingOverride(row)
+        }));
+      }
       setMessage(JSON.stringify(response, null, 2));
       await loadEntries();
     } catch (error) {

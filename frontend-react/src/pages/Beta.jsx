@@ -25,9 +25,47 @@ const blockedPushPans = new Set([
 
 const isBlockedPushPan = (pan) => blockedPushPans.has(String(pan || '').trim().toUpperCase());
 
+const cvlkraIssueText = (row) => [
+  row?.cvlkra?.status,
+  row?.cvlkra?.error,
+  row?.cvlkra?.remarks,
+  row?.cvlkra?.errorCode
+].filter(Boolean).join(' ').toLowerCase();
+
+const hasKraNameMismatch = (row) => cvlkraIssueText(row).includes('name mismatch with income tax');
+
+const hasKraXmlHold = (row) => {
+  const issueText = cvlkraIssueText(row);
+  return (
+    issueText.includes('aadhaar xml file not provided') ||
+    issueText.includes('xml aadhaar validation failed')
+  );
+};
+
+const displayCvlkra = (row) => {
+  if (hasKraNameMismatch(row)) {
+    return {
+      ...(row.cvlkra || {}),
+      status: 'Name_Mismatch',
+      error: row.cvlkra?.error || 'Name mismatch with Income Tax. Client consent/correction needed.'
+    };
+  }
+
+  if (hasKraXmlHold(row)) {
+    return {
+      ...(row.cvlkra || {}),
+      status: 'XML_Hold',
+      error: row.cvlkra?.error || 'Aadhaar XML validation/document issue.'
+    };
+  }
+
+  return row.cvlkra;
+};
+
 const statusTone = (status) => {
   const value = String(status || '').toLowerCase();
   if (['success', 'passed', 'documents_uploaded', 'uploaded', 's'].includes(value)) return '#22c55e';
+  if (['name_mismatch', 'xml_hold', 'kra_xml_hold'].some(x => value.includes(x))) return '#f97316';
   if (['pending', 'under process', 'documents uploaded'].some(x => value.includes(x))) return '#eab308';
   if (['failed', 'rejected', 'error', 'hold'].some(x => value.includes(x))) return '#ef4444';
   return '#94a3b8';
@@ -246,14 +284,17 @@ const targetDisabledReason = (target, row) => {
   const cdslUploaded = isCdslUploaded(row);
   const directKraFlow = row.flow_type === 'KRA';
   const cvlkraStatus = String(row.cvlkra?.status || '').toLowerCase();
+  const nameMismatchReason = 'Name mismatch with Income Tax. Do not push without client consent.';
 
   if (target === 'cvlkra') {
+    if (hasKraNameMismatch(row)) return nameMismatchReason;
     if (isBlockedPushPan(row.pan)) return 'Push blocked: KYC team completed KRA manually for this PAN';
     if (!isStatusPendingLike(row.cvlkra?.status)) return 'CVL KRA is not pending';
     return '';
   }
 
   if (target === 'cvlkra_document') {
+    if (hasKraNameMismatch(row)) return nameMismatchReason;
     if (isBlockedPushPan(row.pan)) return 'Push blocked: KYC team completed KRA manually for this PAN';
     if (directKraFlow) return 'Not needed for direct KRA flow';
     if (!isStatusSuccess(row.cvlkra?.status) && cvlkraStatus !== 'documents_uploaded') return 'Fresh KRA must be accepted before document upload';
@@ -481,7 +522,7 @@ function BetaTable({
                   <td style={{ ...tableColumnStyles.application, verticalAlign: 'top' }}>{text(row.application_id)}</td>
                   <td style={{ ...tableColumnStyles.name, verticalAlign: 'top', whiteSpace: 'normal', overflowWrap: 'anywhere' }}>{text(row.client_name)}</td>
                   <td style={{ ...tableColumnStyles.stage, verticalAlign: 'top' }}>{text(row.current_step)}</td>
-                  <td style={{ ...tableColumnStyles.integration, verticalAlign: 'top' }}>{statusCell(row.cvlkra, actions.cvlkra)}</td>
+                  <td style={{ ...tableColumnStyles.integration, verticalAlign: 'top' }}>{statusCell(displayCvlkra(row), actions.cvlkra)}</td>
                   <td style={{ ...tableColumnStyles.integration, verticalAlign: 'top' }}>{statusCell(row.cdsl, actions.cdsl)}</td>
                   <td style={{ ...tableColumnStyles.integration, verticalAlign: 'top' }}>{statusCell(row.nse, actions.nse)}</td>
                   <td style={{ ...tableColumnStyles.integration, verticalAlign: 'top' }}>{statusCell(row.bse, actions.bse)}</td>

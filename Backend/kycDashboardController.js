@@ -801,6 +801,23 @@ const mapBetaFlowType = (row) => {
   return 'Unknown';
 };
 
+const classifyBetaCvlkraStatus = (row, normalizeOptionalStatus) => {
+  const normalizedStatus = normalizeOptionalStatus(row.cvlkra_status);
+  const issueText = [
+    row.cvlkra_error,
+    row.cvlkra_remarks,
+    row.cvlkra_error_code
+  ].filter(Boolean).join(' ').toLowerCase();
+
+  if (issueText.includes('name mismatch with income tax')) return 'KRA_Name_Mismatch';
+  if (
+    issueText.includes('aadhaar xml file not provided') ||
+    issueText.includes('xml aadhaar validation failed')
+  ) return 'KRA_XML_Hold';
+
+  return normalizedStatus;
+};
+
 const getBetaEntries = async (req, res) => {
   try {
     const {
@@ -950,6 +967,18 @@ const getBetaEntries = async (req, res) => {
         cvl.id AS cvlkra_id,
         cvl.sync_status AS cvlkra_status,
         cvl.error_description AS cvlkra_error,
+        COALESCE(
+          cvl.api_response_payload #>> '{final_status_response,resdtls,KYC_DATA,APP_REMARKS}',
+          cvl.api_response_payload #>> '{final_status_response,resdtls,KYCDATA,APP_REMARKS}',
+          cvl.api_response_payload #>> '{resdtls,KYC_DATA,APP_REMARKS}',
+          cvl.api_response_payload #>> '{resdtls,KYCDATA,APP_REMARKS}'
+        ) AS cvlkra_remarks,
+        COALESCE(
+          cvl.api_response_payload #>> '{final_status_response,resdtls,KYC_DATA,APP_ERROR_DESC}',
+          cvl.api_response_payload #>> '{final_status_response,resdtls,KYCDATA,APP_ERROR_DESC}',
+          cvl.api_response_payload #>> '{resdtls,KYC_DATA,APP_ERROR_DESC}',
+          cvl.api_response_payload #>> '{resdtls,KYCDATA,APP_ERROR_DESC}'
+        ) AS cvlkra_error_code,
         cvl.cvlkra_acknowledgment_id,
         cvl.aadhaar_xml_s3_key,
         CASE
@@ -1000,14 +1029,43 @@ const getBetaEntries = async (req, res) => {
       pool.query(countQuery, params)
     ]);
 
+    const normalizeOptionalStatus = (status) => status ? normalizeStatus(status) : null;
     const data = dataResult.rows.map(row => ({
       ...row,
       flow_type: mapBetaFlowType(row),
-      cvlkra_status: normalizeStatus(row.cvlkra_status),
-      cdsl_push_status: normalizeStatus(row.cdsl_push_status),
-      nse_push_status: normalizeStatus(row.nse_push_status),
-      bse_status: normalizeStatus(row.bse_status),
-      techexcel_push_status: normalizeStatus(row.techexcel_push_status)
+      cvlkra_status: classifyBetaCvlkraStatus(row, normalizeOptionalStatus),
+      cdsl_push_status: normalizeOptionalStatus(row.cdsl_push_status),
+      nse_push_status: normalizeOptionalStatus(row.nse_push_status),
+      bse_status: normalizeOptionalStatus(row.bse_status),
+      techexcel_push_status: normalizeOptionalStatus(row.techexcel_push_status),
+      cvlkra: {
+        id: row.cvlkra_id,
+        status: classifyBetaCvlkraStatus(row, normalizeOptionalStatus),
+        error: [row.cvlkra_remarks, row.cvlkra_error].filter(Boolean).join(' | ') || null,
+        errorCode: row.cvlkra_error_code,
+        remarks: row.cvlkra_remarks,
+        acknowledgmentId: row.cvlkra_acknowledgment_id
+      },
+      cdsl: {
+        id: row.cdsl_id,
+        status: normalizeOptionalStatus(row.cdsl_push_status),
+        boId: row.bo_id,
+        error: row.cdsl_msg_desc
+      },
+      nse: {
+        id: row.nse_id,
+        status: normalizeOptionalStatus(row.nse_push_status),
+        error: row.nse_msg_desc
+      },
+      bse: {
+        id: row.bse_id,
+        status: normalizeOptionalStatus(row.bse_status),
+        clientCode: row.bse_client_code
+      },
+      techexcel: {
+        clientId: row.techexcel_client_id,
+        status: normalizeOptionalStatus(row.techexcel_push_status)
+      }
     }));
 
     return res.status(200).json({

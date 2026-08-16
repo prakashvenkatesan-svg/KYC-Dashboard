@@ -10,6 +10,23 @@ const blankFilters = {
   completed: 'true'
 };
 
+const blockedPushPans = new Set([
+  'EUXPA0011G',
+  'BSBPH1408R',
+  'DAFPK5513Q',
+  'HJEPM7970R',
+  'JNYPM9317Q',
+  'AKAPN8939K',
+  'AUJPR2926D',
+  'GKMPS6855K',
+  'CEQPG6014L',
+  'BTUPB7271G',
+  'KPUPS9096M',
+  'ALQPN5323G'
+]);
+
+const isBlockedPushPan = (pan) => blockedPushPans.has(String(pan || '').trim().toUpperCase());
+
 const statusTone = (status) => {
   const value = String(status || '').toLowerCase();
   if (['success', 'passed', 'documents_uploaded', 'uploaded', 's'].includes(value)) return '#22c55e';
@@ -204,6 +221,10 @@ const targetDisabledReason = (target, row) => {
   const cdslUploaded = isCdslUploaded(row);
   const directKraFlow = row.flow_type === 'KRA';
   const cvlkraStatus = String(row.cvlkra?.status || '').toLowerCase();
+
+  if (isBlockedPushPan(row.pan)) {
+    return 'Push blocked: KYC team completed KRA manually for this PAN';
+  }
 
   if (target === 'cvlkra') {
     if (directKraFlow) return 'Not needed for direct KRA flow';

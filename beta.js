@@ -6,6 +6,23 @@ const betaState = {
 
 const betaEls = {};
 
+const blockedPushPans = new Set([
+  'EUXPA0011G',
+  'BSBPH1408R',
+  'DAFPK5513Q',
+  'HJEPM7970R',
+  'JNYPM9317Q',
+  'AKAPN8939K',
+  'AUJPR2926D',
+  'GKMPS6855K',
+  'CEQPG6014L',
+  'BTUPB7271G',
+  'KPUPS9096M',
+  'ALQPN5323G'
+]);
+
+const isBlockedPushPan = (pan) => blockedPushPans.has(String(pan || '').trim().toUpperCase());
+
 const safe = (value) => String(value ?? '')
   .replace(/&/g, '&amp;')
   .replace(/</g, '&lt;')
@@ -102,11 +119,15 @@ const rowMatches = (row, filterText) => {
 const renderPushButtons = (row) => {
   const appId = safe(row.application_id);
   const pan = safe(row.pan);
+  const blocked = isBlockedPushPan(row.pan);
+  const blockedAttrs = blocked
+    ? 'disabled title="Push blocked: KYC team completed KRA manually for this PAN"'
+    : '';
   return `
     <div class="beta-push-actions">
-      <button data-push-target="cvlkra" data-application-id="${appId}" data-pan="${pan}">KRA Push</button>
-      <button data-push-target="cvlkra_document" data-application-id="${appId}" data-pan="${pan}">Doc Push</button>
-      <button data-push-target="orchestrator" data-application-id="${appId}" data-pan="${pan}">Orchestrator</button>
+      <button data-push-target="cvlkra" data-application-id="${appId}" data-pan="${pan}" ${blockedAttrs}>KRA Push</button>
+      <button data-push-target="cvlkra_document" data-application-id="${appId}" data-pan="${pan}" ${blockedAttrs}>Doc Push</button>
+      <button data-push-target="orchestrator" data-application-id="${appId}" data-pan="${pan}" ${blockedAttrs}>Orchestrator</button>
     </div>
   `;
 };
@@ -234,6 +255,11 @@ const handlePushClick = async (event) => {
   const applicationId = button.dataset.applicationId;
   const pan = button.dataset.pan;
   const label = button.textContent.trim();
+  if (isBlockedPushPan(pan)) {
+    showAlert(`Push blocked for ${safe(pan)}. KYC team completed KRA manually for this PAN.`, 'failed');
+    return;
+  }
+
   const ok = window.confirm(`Run ${label} for ${pan || applicationId}?`);
   if (!ok) return;
 

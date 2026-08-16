@@ -1186,6 +1186,36 @@ const getBetaPushFailure = (httpResponse, targetResponse) => {
   return inspectPushPayloadForFailure(lambdaResponse);
 };
 
+const BETA_PUSH_BLOCKED_PANS = new Set([
+  'EUXPA0011G',
+  'BSBPH1408R',
+  'DAFPK5513Q',
+  'HJEPM7970R',
+  'JNYPM9317Q',
+  'AKAPN8939K',
+  'AUJPR2926D',
+  'GKMPS6855K',
+  'CEQPG6014L',
+  'BTUPB7271G',
+  'KPUPS9096M',
+  'ALQPN5323G'
+]);
+
+const normalizePan = (value) => String(value || '').trim().toUpperCase();
+
+const getBlockedPansFromPushRequest = ({ pan, payload }) => {
+  const candidatePans = new Set();
+  const addPan = value => {
+    const normalized = normalizePan(value);
+    if (normalized) candidatePans.add(normalized);
+  };
+
+  addPan(pan);
+  if (Array.isArray(payload?.pans)) payload.pans.forEach(addPan);
+
+  return [...candidatePans].filter(candidatePan => BETA_PUSH_BLOCKED_PANS.has(candidatePan));
+};
+
 const pushBetaEntry = async (req, res) => {
   try {
     const { target, applicationId, pan, payload } = req.body || {};
@@ -1199,6 +1229,15 @@ const pushBetaEntry = async (req, res) => {
     const allowedTargets = ['orchestrator', 'cvlkra', 'cvlkra_document', 'cdsl', 'nse', 'bse', 'techexcel'];
     if (!allowedTargets.includes(normalized)) {
       return res.status(400).json({ success: false, message: "Unsupported push target." });
+    }
+
+    const blockedPans = getBlockedPansFromPushRequest({ pan, payload });
+    if (blockedPans.length) {
+      return res.status(409).json({
+        success: false,
+        message: "Push blocked from dashboard. KYC team completed KRA manually for these PANs.",
+        blockedPans
+      });
     }
 
     const finalPayload = payload && typeof payload === 'object'

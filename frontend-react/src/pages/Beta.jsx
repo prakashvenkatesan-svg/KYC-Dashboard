@@ -605,7 +605,7 @@ export default function Beta() {
         pan: firstRow.pan,
         payload
       });
-      if (target === 'cdsl') {
+      if (target === 'cdsl' || target === 'cdsl_status') {
         setRowOverrides(current => {
           const next = { ...current };
           rows.forEach(row => {
@@ -657,7 +657,7 @@ export default function Beta() {
         pan: row.pan,
         ...(payload ? { payload } : {})
       });
-      if (target === 'cdsl') {
+      if (target === 'cdsl' || target === 'cdsl_status') {
         setRowOverrides(current => ({
           ...current,
           [getRowKey(row)]: markCdslWaitingOverride(row)

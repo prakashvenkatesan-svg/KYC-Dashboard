@@ -147,7 +147,17 @@ const isCdslUploaded = (row) => {
 
 const isStatusPendingLike = (status) => {
   const value = String(status || '').toLowerCase();
-  return !value || value === '-' || ['pending', 'not pushed', 'rejected', 'failed'].some(term => value.includes(term));
+  return !value || value === '-' || [
+    'pending',
+    'not pushed',
+    'rejected',
+    'failed',
+    'unclear',
+    'not_accepted',
+    'not accepted',
+    'fetch_failed',
+    'fetch failed'
+  ].some(term => value.includes(term));
 };
 
 const getRowKey = (row) => `${row.flow_type}-${row.application_id}-${row.pan || ''}`;
@@ -508,6 +518,8 @@ export default function Beta() {
     setLoading(true);
     setMessage('');
     try {
+      setEntries([]);
+      setSummary({});
       const params = { ...filters, completed: 'true', limit: 500 };
       Object.keys(params).forEach(key => {
         if (params[key] === '') delete params[key];
@@ -541,8 +553,10 @@ export default function Beta() {
   }, [loadEntries]);
 
   const displayEntries = useMemo(
-    () => entries.map(row => applyRowOverrides(row, rowOverrides)),
-    [entries, rowOverrides]
+    () => entries
+      .map(row => applyRowOverrides(row, rowOverrides))
+      .filter(row => includesText(row, filters.q)),
+    [entries, rowOverrides, filters.q]
   );
 
   const grouped = useMemo(() => {

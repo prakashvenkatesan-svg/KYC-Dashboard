@@ -848,13 +848,20 @@ const getBetaEntries = async (req, res) => {
           OR ka.id::text = ANY($${params.length})
         )`);
       } else {
-        params.push(`%${q.trim()}%`);
+        const token = qTokens[0] || q.trim();
+        params.push(token.toUpperCase());
+        const exactIdx = params.length;
+        params.push(`%${token}%`);
+        const likeIdx = params.length;
         conditions.push(`(
-          COALESCE(ka.client_code, cc.client_code, tech."Client_id", '') ILIKE $${params.length}
-          OR COALESCE(iv.pan_number, cvl.app_pan_no, tech."PAN_NO", '') ILIKE $${params.length}
-          OR COALESCE(iv.full_name, digi.name, cvl.app_name, tech."Client_Name", '') ILIKE $${params.length}
-          OR COALESCE(cd.email, '') ILIKE $${params.length}
-          OR COALESCE(cd.mobile_number, '') ILIKE $${params.length}
+          UPPER(COALESCE(ka.client_code, cc.client_code, tech."Client_id", '')) = $${exactIdx}
+          OR UPPER(COALESCE(iv.pan_number, cvl.app_pan_no, tech."PAN_NO", '')) = $${exactIdx}
+          OR ka.id::text = $${exactIdx}
+          OR COALESCE(ka.client_code, cc.client_code, tech."Client_id", '') ILIKE $${likeIdx}
+          OR COALESCE(iv.pan_number, cvl.app_pan_no, tech."PAN_NO", '') ILIKE $${likeIdx}
+          OR COALESCE(iv.full_name, digi.name, cvl.app_name, tech."Client_Name", '') ILIKE $${likeIdx}
+          OR COALESCE(cd.email, '') ILIKE $${likeIdx}
+          OR COALESCE(cd.mobile_number, '') ILIKE $${likeIdx}
         )`);
       }
     }

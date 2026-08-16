@@ -200,12 +200,19 @@ const loadingLabel = (target) => ({
 
 const includesText = (row, query) => {
   if (!query) return true;
-  const needle = query.toLowerCase();
-  return [
+  const tokens = query
+    .split(/[\n,]+/)
+    .map(token => token.trim().toLowerCase())
+    .filter(Boolean);
+  const needles = tokens.length > 1 ? tokens : [query.trim().toLowerCase()].filter(Boolean);
+  const exactFields = [
     row.pan,
     row.client_code,
+    row.application_id
+  ].map(value => String(value || '').trim().toLowerCase());
+  const searchableFields = [
+    ...exactFields,
     row.client_name,
-    row.application_id,
     row.current_step,
     row.cvlkra?.status,
     row.cdsl?.status,
@@ -213,7 +220,15 @@ const includesText = (row, query) => {
     row.bse?.status,
     row.techexcel?.status,
     row.xml_status
-  ].some(value => String(value || '').toLowerCase().includes(needle));
+  ];
+
+  if (tokens.length > 1) {
+    return needles.some(needle => exactFields.includes(needle));
+  }
+
+  return [
+    ...searchableFields
+  ].some(value => String(value || '').toLowerCase().includes(needles[0]));
 };
 
 const targetDisabledReason = (target, row) => {

@@ -835,14 +835,28 @@ const getBetaEntries = async (req, res) => {
     `;
 
     if (q.trim()) {
-      params.push(`%${q.trim()}%`);
-      conditions.push(`(
-        COALESCE(ka.client_code, cc.client_code, tech."Client_id", '') ILIKE $${params.length}
-        OR COALESCE(iv.pan_number, cvl.app_pan_no, tech."PAN_NO", '') ILIKE $${params.length}
-        OR COALESCE(iv.full_name, digi.name, cvl.app_name, tech."Client_Name", '') ILIKE $${params.length}
-        OR COALESCE(cd.email, '') ILIKE $${params.length}
-        OR COALESCE(cd.mobile_number, '') ILIKE $${params.length}
-      )`);
+      const qTokens = q
+        .split(/[\n,]+/)
+        .map(token => token.trim())
+        .filter(Boolean);
+
+      if (qTokens.length > 1) {
+        params.push(qTokens.map(token => token.toUpperCase()));
+        conditions.push(`(
+          UPPER(COALESCE(ka.client_code, cc.client_code, tech."Client_id", '')) = ANY($${params.length})
+          OR UPPER(COALESCE(iv.pan_number, cvl.app_pan_no, tech."PAN_NO", '')) = ANY($${params.length})
+          OR ka.id::text = ANY($${params.length})
+        )`);
+      } else {
+        params.push(`%${q.trim()}%`);
+        conditions.push(`(
+          COALESCE(ka.client_code, cc.client_code, tech."Client_id", '') ILIKE $${params.length}
+          OR COALESCE(iv.pan_number, cvl.app_pan_no, tech."PAN_NO", '') ILIKE $${params.length}
+          OR COALESCE(iv.full_name, digi.name, cvl.app_name, tech."Client_Name", '') ILIKE $${params.length}
+          OR COALESCE(cd.email, '') ILIKE $${params.length}
+          OR COALESCE(cd.mobile_number, '') ILIKE $${params.length}
+        )`);
+      }
     }
 
     if (flow.trim()) {

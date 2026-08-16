@@ -106,7 +106,7 @@ const statusCell = (integration, actions = []) => {
                 boxShadow: action.disabled ? 'none' : '0 2px 8px rgba(37, 99, 235, 0.28)'
               }}
             >
-              {action.loading ? 'Loading...' : action.label}
+              {action.loading ? (action.loadingLabel || 'Loading...') : action.label}
             </button>
           ))}
         </div>
@@ -170,6 +170,16 @@ const pushLabel = (target) => ({
   bse: 'BSE Push',
   techexcel: 'TechExcel Push'
 }[target] || target);
+
+const loadingLabel = (target) => ({
+  cvlkra: 'Pushing KRA...',
+  cvlkra_document: 'Uploading docs...',
+  cdsl: 'Pushing CDSL...',
+  cdsl_status: 'Checking CDSL...',
+  nse: 'Pushing NSE...',
+  bse: 'Pushing BSE...',
+  techexcel: 'Pushing TechExcel...'
+}[target] || 'Loading...');
 
 const includesText = (row, query) => {
   if (!query) return true;
@@ -269,6 +279,7 @@ function BetaTable({
     return {
       key,
       label,
+      loadingLabel: loadingLabel(target),
       loading,
       disabled: Boolean(disabledReason) || Boolean(pushingKey),
       title: disabledReason || title,
@@ -285,17 +296,17 @@ function BetaTable({
       cvlkra: directKraFlow
         ? []
         : [
-          makeAction('cvlkra', row, 'Push', 'Submit the fresh CVL KRA entry'),
-          makeAction('cvlkra_document', row, 'Docs', 'Upload KRA PDF/XML documents')
+          makeAction('cvlkra', row, 'Push KRA', 'Submit the fresh CVL KRA entry'),
+          makeAction('cvlkra_document', row, 'Upload Docs', 'Upload KRA PDF/XML documents')
         ],
       cdsl: cdslUploaded
-        ? [makeAction('cdsl_status', row, 'Check', 'Download and apply the final CDSL response')]
+        ? [makeAction('cdsl_status', row, 'Check CDSL', 'Download and apply the final CDSL response')]
         : [
-          makeAction('cdsl', row, 'Push', 'Push this record to CDSL')
+          makeAction('cdsl', row, 'Push CDSL', 'Push this record to CDSL')
         ],
-      nse: [makeAction('nse', row, 'Push', cdslSuccess ? 'Push this record to NSE' : 'CDSL must be success before NSE')],
-      bse: [makeAction('bse', row, 'Push', cdslSuccess ? 'Push this record to BSE' : 'CDSL must be success before BSE')],
-      techexcel: [makeAction('techexcel', row, 'Push', cdslSuccess ? 'Push this record to TechExcel' : 'CDSL must be success before TechExcel')]
+      nse: [makeAction('nse', row, 'Push NSE', cdslSuccess ? 'Push this record to NSE' : 'CDSL must be success before NSE')],
+      bse: [makeAction('bse', row, 'Push BSE', cdslSuccess ? 'Push this record to BSE' : 'CDSL must be success before BSE')],
+      techexcel: [makeAction('techexcel', row, 'Push TechExcel', cdslSuccess ? 'Push this record to TechExcel' : 'CDSL must be success before TechExcel')]
     };
   };
 
@@ -321,7 +332,7 @@ function BetaTable({
           boxShadow: disabled ? 'none' : '0 2px 8px rgba(37, 99, 235, 0.28)'
         }}
       >
-        {loading ? 'Loading...' : `${pushLabel(target)} (${eligibleRows.length})`}
+        {loading ? loadingLabel(target) : `${pushLabel(target)} (${eligibleRows.length})`}
       </button>
     );
   };
@@ -614,8 +625,8 @@ export default function Beta() {
           return next;
         });
       }
-      setMessage(JSON.stringify(response, null, 2));
       await loadEntries();
+      setMessage(JSON.stringify(response, null, 2));
     } catch (error) {
       setMessage(error.message || `Push failed for ${label}.`);
     } finally {
@@ -663,8 +674,8 @@ export default function Beta() {
           [getRowKey(row)]: markCdslWaitingOverride(row)
         }));
       }
-      setMessage(JSON.stringify(response, null, 2));
       await loadEntries();
+      setMessage(JSON.stringify(response, null, 2));
     } catch (error) {
       setMessage(error.message || `Push failed for ${label}.`);
     } finally {

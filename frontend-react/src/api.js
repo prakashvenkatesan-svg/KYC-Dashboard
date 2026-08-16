@@ -348,7 +348,13 @@ const api = {
       headers: getAuthHeaders(),
       body: JSON.stringify(payload)
     });
-    return parseApiResponse(res, 'Push request completed.');
+    const data = await parseApiResponse(res, 'Push request completed.');
+    if (!res.ok || data?.success === false) {
+      const error = new Error(data?.error || data?.message || 'Push request failed.');
+      error.payload = data;
+      throw error;
+    }
+    return data;
   },
   
   // Generic methods for User Management (and others)

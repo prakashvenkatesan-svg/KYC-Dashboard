@@ -628,7 +628,7 @@ export default function Beta() {
       await loadEntries();
       setMessage(JSON.stringify(response, null, 2));
     } catch (error) {
-      setMessage(error.message || `Push failed for ${label}.`);
+      setMessage(error.payload ? JSON.stringify(error.payload, null, 2) : (error.message || `Push failed for ${label}.`));
     } finally {
       setPushingKey('');
     }
@@ -677,7 +677,7 @@ export default function Beta() {
       await loadEntries();
       setMessage(JSON.stringify(response, null, 2));
     } catch (error) {
-      setMessage(error.message || `Push failed for ${label}.`);
+      setMessage(error.payload ? JSON.stringify(error.payload, null, 2) : (error.message || `Push failed for ${label}.`));
     } finally {
       setPushingKey('');
     }

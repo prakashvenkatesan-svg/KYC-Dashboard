@@ -1106,6 +1106,86 @@ const buildDefaultBetaPushPayload = ({ target, applicationId, pan }) => {
   };
 };
 
+const parseJsonIfString = (value) => {
+  if (typeof value !== 'string') return value;
+  const trimmed = value.trim();
+  if (!trimmed) return value;
+  try {
+    return JSON.parse(trimmed);
+  } catch (error) {
+    return value;
+  }
+};
+
+const getPushFailureMessage = (payload, fallback) => {
+  const body = parseJsonIfString(payload?.body);
+  if (body && typeof body === 'object') {
+    return body.error || body.message || body.errorMessage || fallback;
+  }
+  if (typeof body === 'string' && body.trim()) return body.trim();
+  return payload?.error || payload?.message || fallback;
+};
+
+const inspectPushPayloadForFailure = (payload, depth = 0) => {
+  if (depth > 5) return null;
+  const parsed = parseJsonIfString(payload);
+  if (!parsed || typeof parsed !== 'object') return null;
+
+  if (parsed.functionError) {
+    return {
+      failedAt: 'lambda_invocation',
+      statusCode: parsed.statusCode || null,
+      message: parsed.functionError
+    };
+  }
+
+  const status = Number(parsed.statusCode);
+  if (status >= 400) {
+    return {
+      failedAt: 'lambda_business_response',
+      statusCode: status,
+      message: getPushFailureMessage(parsed, `Lambda returned status ${status}`)
+    };
+  }
+
+  const body = parseJsonIfString(parsed.body);
+  if (body && typeof body === 'object' && (body.error || body.success === false)) {
+    return {
+      failedAt: 'lambda_business_body',
+      statusCode: status || null,
+      message: body.error || body.message || 'Lambda returned an error response'
+    };
+  }
+
+  return (
+    inspectPushPayloadForFailure(parsed.response, depth + 1) ||
+    inspectPushPayloadForFailure(parsed.Payload, depth + 1) ||
+    inspectPushPayloadForFailure(body, depth + 1)
+  );
+};
+
+const getBetaPushFailure = (httpResponse, targetResponse) => {
+  const httpStatus = Number(httpResponse?.statusCode);
+  if (httpStatus >= 400) {
+    return {
+      failedAt: 'transport',
+      statusCode: httpStatus,
+      message: getPushFailureMessage(httpResponse, `Push transport returned HTTP ${httpStatus}`)
+    };
+  }
+
+  const lambdaResponse = targetResponse || httpResponse;
+  if (lambdaResponse?.functionError) {
+    return {
+      failedAt: 'lambda_invocation',
+      statusCode: lambdaResponse.statusCode || null,
+      message: lambdaResponse.functionError
+    };
+  }
+
+  return inspectPushPayloadForFailure(lambdaResponse);
+};
+
 const pushBetaEntry = async (req, res) => {
   try {
     const { target, applicationId, pan, payload } = req.body || {};
@@ -1135,12 +1215,27 @@ const pushBetaEntry = async (req, res) => {
     }
 
     const response = await postJson(url, finalPayload);
-    return res.status(200).json({
-      success: response.statusCode >= 200 && response.statusCode < 300,
+    const targetResponse = response?.body && typeof response.body === 'object'
+      ? response.body
+      : response;
+    const pushFailure = getBetaPushFailure(response, targetResponse);
+    const result = {
+      success: !pushFailure,
       target: normalized,
       requestPayload: finalPayload,
-      response
-    });
+      response: targetResponse
+    };
+
+    if (pushFailure) {
+      return res.status(502).json({
+        ...result,
+        message: pushFailure.message,
+        error: pushFailure.message,
+        failure: pushFailure
+      });
+    }
+
+    return res.status(200).json(result);
   } catch (error) {
     console.error("Beta push error:", error);
     return res.status(500).json({ success: false, message: "Server error while pushing beta entry", error: error.message });

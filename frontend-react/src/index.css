@@ -984,13 +984,35 @@ tbody tr:hover {
   opacity: 0.65;
 }
 
+.beta-response-panel {
+  background: var(--panel-surface);
+  border: 1px solid var(--surface-border);
+  border-radius: 8px;
+  margin-bottom: 16px;
+  overflow: hidden;
+}
+
+.beta-response-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--surface-border);
+}
+
+.beta-response-copy-btn {
+  min-width: 72px;
+}
+
 .beta-alert {
   max-height: 240px;
   overflow: auto;
   white-space: pre-wrap;
-  background: var(--panel-surface);
-  border: 1px solid var(--surface-border);
-  border-radius: 8px;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
   color: var(--text-primary);
   padding: 12px;
+  margin: 0;
 }

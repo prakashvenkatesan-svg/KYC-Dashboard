@@ -452,6 +452,7 @@ export default function Beta() {
   const [digiLocalFilter, setDigiLocalFilter] = useState('');
   const [selectedKeys, setSelectedKeys] = useState(new Set());
   const [rowOverrides, setRowOverrides] = useState({});
+  const [responseCopied, setResponseCopied] = useState(false);
 
   const updateFilter = (key, value) => {
     setFilters(current => ({ ...current, [key]: value }));
@@ -512,6 +513,13 @@ export default function Beta() {
     }
     await navigator.clipboard.writeText(pans);
     setMessage(`Copied ${grouped.kra.length} KRA flow PAN(s).`);
+  };
+
+  const copyResponse = async () => {
+    if (!message) return;
+    await navigator.clipboard.writeText(message);
+    setResponseCopied(true);
+    window.setTimeout(() => setResponseCopied(false), 1600);
   };
 
   const toggleRow = (key) => {
@@ -606,6 +614,7 @@ export default function Beta() {
     if (!window.confirm(`Push ${label}?${skipText}`)) return;
 
     setPushingKey(`batch:${target}`);
+    setResponseCopied(false);
     setMessage(`Sending ${label}...${skipText}`);
     try {
       const payload = buildBatchPayload(target, rows);
@@ -639,6 +648,7 @@ export default function Beta() {
     if (!window.confirm(`Push ${label}?`)) return;
     const nextPushingKey = `${target}:${row.application_id}:${row.pan || ''}`;
     setPushingKey(nextPushingKey);
+    setResponseCopied(false);
     setMessage(`Sending ${label}...`);
     try {
       const payload = target === 'cdsl_status'
@@ -728,7 +738,17 @@ export default function Beta() {
         <div className="beta-section"><div style={{ color: 'var(--text-muted)', fontSize: '0.78rem' }}>eSign Completed</div><strong>{summary.esign_completed_count || 0}</strong></div>
       </div>
 
-      {message ? <pre className="beta-alert">{message}</pre> : null}
+      {message ? (
+        <section className="beta-response-panel">
+          <div className="beta-response-header">
+            <strong>Response</strong>
+            <button className="beta-secondary-btn beta-response-copy-btn" onClick={copyResponse}>
+              {responseCopied ? 'Copied' : 'Copy'}
+            </button>
+          </div>
+          <pre className="beta-alert">{message}</pre>
+        </section>
+      ) : null}
 
       <BetaTable
         title="KRA Flow"

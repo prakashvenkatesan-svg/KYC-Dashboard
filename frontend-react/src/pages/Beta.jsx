@@ -115,10 +115,19 @@ const statusCell = (integration, actions = []) => {
   );
 };
 
-const isCdslUploaded = (row) => String(row?.cdsl?.status || '').toLowerCase() === 'uploaded';
 const isStatusSuccess = (status) => {
   const value = String(status || '').toLowerCase();
   return ['success', 'passed', 'success(s)', 's'].includes(value) || value.startsWith('success');
+};
+const isStatusFailed = (status) => {
+  const value = String(status || '').toLowerCase();
+  return ['failed', 'rejected'].some(term => value.includes(term));
+};
+const isCdslUploaded = (row) => {
+  const status = String(row?.cdsl?.status || '').toLowerCase();
+  if (status === 'uploaded') return true;
+  if (isStatusSuccess(status) || isStatusFailed(status)) return false;
+  return Boolean(row?.cdsl?.ackId && row?.cdsl?.zipFileName);
 };
 
 const isStatusPendingLike = (status) => {

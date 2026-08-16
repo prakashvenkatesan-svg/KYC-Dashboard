@@ -45,6 +45,7 @@ const text = (value) => {
 };
 
 const tableColumnStyles = {
+  select: { width: 48 },
   pan: { width: 112 },
   clientCode: { width: 92 },
   application: { width: 110 },
@@ -98,7 +99,11 @@ const statusCell = (integration, actions = []) => {
                 padding: '5px 8px',
                 fontSize: '0.72rem',
                 minHeight: 28,
-                opacity: action.disabled ? 0.55 : 1
+                opacity: action.disabled ? 0.48 : 1,
+                background: action.disabled ? 'var(--subtle-surface)' : (action.primary ? 'var(--primary-color)' : '#2563eb'),
+                borderColor: action.disabled ? 'var(--surface-border)' : (action.primary ? 'var(--primary-color)' : '#1d4ed8'),
+                color: action.disabled ? 'var(--text-muted)' : '#fff',
+                boxShadow: action.disabled ? 'none' : '0 2px 8px rgba(37, 99, 235, 0.28)'
               }}
             >
               {action.loading ? 'Loading...' : action.label}
@@ -120,6 +125,8 @@ const isStatusPendingLike = (status) => {
   const value = String(status || '').toLowerCase();
   return !value || value === '-' || ['pending', 'not pushed', 'rejected', 'failed'].some(term => value.includes(term));
 };
+
+const getRowKey = (row) => `${row.flow_type}-${row.application_id}-${row.pan || ''}`;
 
 const pushLabel = (target) => ({
   cvlkra: 'KRA Push',
@@ -149,23 +156,89 @@ const includesText = (row, query) => {
   ].some(value => String(value || '').toLowerCase().includes(needle));
 };
 
-function BetaTable({ title, description, rows, localFilter, onLocalFilter, onPush, pushingKey }) {
+const targetDisabledReason = (target, row) => {
+  const cdslSuccess = isStatusSuccess(row.cdsl?.status);
+  const cdslUploaded = isCdslUploaded(row);
+  const directKraFlow = row.flow_type === 'KRA';
+  const cvlkraStatus = String(row.cvlkra?.status || '').toLowerCase();
+
+  if (target === 'cvlkra') {
+    if (directKraFlow) return 'Not needed for direct KRA flow';
+    if (!isStatusPendingLike(row.cvlkra?.status)) return 'CVL KRA is not pending';
+    return '';
+  }
+
+  if (target === 'cvlkra_document') {
+    if (directKraFlow) return 'Not needed for direct KRA flow';
+    if (!isStatusSuccess(row.cvlkra?.status) && cvlkraStatus !== 'documents_uploaded') return 'Fresh KRA must be accepted before document upload';
+    return '';
+  }
+
+  if (target === 'cdsl') {
+    if (isStatusSuccess(row.cdsl?.status)) return 'CDSL is already success';
+    if (cdslUploaded) return 'Use CDSL Check for uploaded rows';
+    return '';
+  }
+
+  if (target === 'cdsl_status') {
+    if (!cdslUploaded) return 'CDSL status must be Uploaded';
+    return '';
+  }
+
+  if (['nse', 'bse', 'techexcel'].includes(target)) {
+    if (!cdslSuccess) return 'CDSL must be success first';
+    if (!isStatusPendingLike(row[target]?.status)) return `${pushLabel(target)} is not pending`;
+    return '';
+  }
+
+  return '';
+};
+
+const batchTargetsForFlow = (flowType) => (
+  flowType === 'KRA'
+    ? ['cdsl', 'cdsl_status', 'nse', 'bse', 'techexcel']
+    : ['cvlkra', 'cvlkra_document', 'cdsl', 'cdsl_status', 'nse', 'bse', 'techexcel']
+);
+
+function BetaTable({
+  title,
+  description,
+  flowType,
+  rows,
+  localFilter,
+  onLocalFilter,
+  onPush,
+  onPushSelected,
+  pushingKey,
+  selectedKeys,
+  onToggleRow,
+  onToggleVisibleRows,
+  onClearSelection
+}) {
   const filteredRows = useMemo(
     () => rows.filter(row => includesText(row, localFilter)),
     [rows, localFilter]
   );
+  const filteredKeys = useMemo(() => filteredRows.map(getRowKey), [filteredRows]);
+  const selectedRows = useMemo(
+    () => filteredRows.filter(row => selectedKeys.has(getRowKey(row))),
+    [filteredRows, selectedKeys]
+  );
+  const selectedCount = selectedRows.length;
+  const allVisibleSelected = filteredKeys.length > 0 && filteredKeys.every(key => selectedKeys.has(key));
 
   const actionKey = (target, row) => `${target}:${row.application_id}:${row.pan || ''}`;
 
-  const makeAction = (target, row, label, disabled = false, title = '') => {
+  const makeAction = (target, row, label, title = '') => {
     const key = actionKey(target, row);
     const loading = pushingKey === key;
+    const disabledReason = targetDisabledReason(target, row);
     return {
       key,
       label,
       loading,
-      disabled: disabled || Boolean(pushingKey),
-      title,
+      disabled: Boolean(disabledReason) || Boolean(pushingKey),
+      title: disabledReason || title,
       onClick: () => onPush(target, row)
     };
   };
@@ -179,18 +252,45 @@ function BetaTable({ title, description, rows, localFilter, onLocalFilter, onPus
       cvlkra: directKraFlow
         ? []
         : [
-          makeAction('cvlkra', row, 'Push', !isStatusPendingLike(row.cvlkra?.status), 'Submit the fresh CVL KRA entry'),
-          makeAction('cvlkra_document', row, 'Docs', !isStatusSuccess(row.cvlkra?.status) && String(row.cvlkra?.status || '').toLowerCase() !== 'documents_uploaded', 'Upload KRA PDF/XML documents')
+          makeAction('cvlkra', row, 'Push', 'Submit the fresh CVL KRA entry'),
+          makeAction('cvlkra_document', row, 'Docs', 'Upload KRA PDF/XML documents')
         ],
       cdsl: cdslUploaded
-        ? [makeAction('cdsl_status', row, 'Check', false, 'Download and apply the final CDSL response')]
+        ? [makeAction('cdsl_status', row, 'Check', 'Download and apply the final CDSL response')]
         : [
-          makeAction('cdsl', row, 'Push', isStatusSuccess(row.cdsl?.status), 'Push this record to CDSL')
+          makeAction('cdsl', row, 'Push', 'Push this record to CDSL')
         ],
-      nse: [makeAction('nse', row, 'Push', !cdslSuccess || !isStatusPendingLike(row.nse?.status), cdslSuccess ? 'Push this record to NSE' : 'CDSL must be success before NSE')],
-      bse: [makeAction('bse', row, 'Push', !cdslSuccess || !isStatusPendingLike(row.bse?.status), cdslSuccess ? 'Push this record to BSE' : 'CDSL must be success before BSE')],
-      techexcel: [makeAction('techexcel', row, 'Push', !cdslSuccess || !isStatusPendingLike(row.techexcel?.status), cdslSuccess ? 'Push this record to TechExcel' : 'CDSL must be success before TechExcel')]
+      nse: [makeAction('nse', row, 'Push', cdslSuccess ? 'Push this record to NSE' : 'CDSL must be success before NSE')],
+      bse: [makeAction('bse', row, 'Push', cdslSuccess ? 'Push this record to BSE' : 'CDSL must be success before BSE')],
+      techexcel: [makeAction('techexcel', row, 'Push', cdslSuccess ? 'Push this record to TechExcel' : 'CDSL must be success before TechExcel')]
     };
+  };
+
+  const batchTargets = batchTargetsForFlow(flowType);
+  const batchButton = (target) => {
+    const eligibleRows = selectedRows.filter(row => !targetDisabledReason(target, row));
+    const disabled = selectedCount === 0 || eligibleRows.length === 0 || Boolean(pushingKey);
+    const loading = pushingKey === `batch:${target}`;
+    return (
+      <button
+        key={target}
+        className="beta-primary-btn"
+        disabled={disabled}
+        onClick={() => onPushSelected(target, eligibleRows, selectedCount - eligibleRows.length)}
+        title={eligibleRows.length ? `${pushLabel(target)} for ${eligibleRows.length} selected row(s)` : 'No selected rows are eligible for this push'}
+        style={{
+          padding: '7px 10px',
+          fontSize: '0.78rem',
+          opacity: disabled ? 0.48 : 1,
+          background: disabled ? 'var(--subtle-surface)' : 'var(--primary-color)',
+          borderColor: disabled ? 'var(--surface-border)' : 'var(--primary-color)',
+          color: disabled ? 'var(--text-muted)' : '#fff',
+          boxShadow: disabled ? 'none' : '0 2px 8px rgba(37, 99, 235, 0.28)'
+        }}
+      >
+        {loading ? 'Loading...' : `${pushLabel(target)} (${eligibleRows.length})`}
+      </button>
+    );
   };
 
   return (
@@ -208,10 +308,44 @@ function BetaTable({ title, description, rows, localFilter, onLocalFilter, onPus
         />
       </div>
 
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 12,
+          flexWrap: 'wrap',
+          marginBottom: 12,
+          padding: '10px 12px',
+          border: '1px solid var(--border-color)',
+          borderRadius: 8,
+          background: 'var(--subtle-surface)'
+        }}
+      >
+        <div style={{ color: 'var(--text-secondary)', fontSize: '0.86rem', fontWeight: 700 }}>
+          {selectedCount} selected in this section
+        </div>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          {batchTargets.map(batchButton)}
+          <button className="beta-secondary-btn" onClick={() => onClearSelection(filteredKeys)} disabled={!selectedCount || Boolean(pushingKey)}>
+            Clear
+          </button>
+        </div>
+      </div>
+
       <div style={{ overflowX: 'auto', border: '1px solid var(--border-color)', borderRadius: 8 }}>
-        <table style={{ width: '100%', minWidth: 1750, borderCollapse: 'collapse', tableLayout: 'fixed' }}>
+        <table style={{ width: '100%', minWidth: 1810, borderCollapse: 'collapse', tableLayout: 'fixed' }}>
           <thead>
             <tr>
+              <th style={tableColumnStyles.select}>
+                <input
+                  type="checkbox"
+                  checked={allVisibleSelected}
+                  disabled={!filteredRows.length || Boolean(pushingKey)}
+                  onChange={() => onToggleVisibleRows(filteredRows, !allVisibleSelected)}
+                  aria-label={`Select all visible ${title} rows`}
+                />
+              </th>
               <th style={tableColumnStyles.pan}>PAN</th>
               <th style={tableColumnStyles.clientCode}>CC</th>
               <th style={tableColumnStyles.application}>Application</th>
@@ -227,11 +361,21 @@ function BetaTable({ title, description, rows, localFilter, onLocalFilter, onPus
           </thead>
           <tbody>
             {filteredRows.length === 0 ? (
-              <tr><td colSpan="11" style={{ textAlign: 'center', padding: 18 }}>No records found.</td></tr>
+              <tr><td colSpan="12" style={{ textAlign: 'center', padding: 18 }}>No records found.</td></tr>
             ) : filteredRows.map(row => {
               const actions = rowActions(row);
+              const key = getRowKey(row);
               return (
-                <tr key={`${row.flow_type}-${row.application_id}-${row.pan}`}>
+                <tr key={key}>
+                  <td style={{ ...tableColumnStyles.select, verticalAlign: 'top' }}>
+                    <input
+                      type="checkbox"
+                      checked={selectedKeys.has(key)}
+                      disabled={Boolean(pushingKey)}
+                      onChange={() => onToggleRow(key)}
+                      aria-label={`Select ${row.pan || row.application_id}`}
+                    />
+                  </td>
                   <td style={{ ...tableColumnStyles.pan, fontFamily: 'monospace', fontWeight: 700, verticalAlign: 'top' }}>{text(row.pan)}</td>
                   <td style={{ ...tableColumnStyles.clientCode, fontFamily: 'monospace', verticalAlign: 'top' }}>{text(row.client_code)}</td>
                   <td style={{ ...tableColumnStyles.application, verticalAlign: 'top' }}>{text(row.application_id)}</td>
@@ -262,6 +406,7 @@ export default function Beta() {
   const [message, setMessage] = useState('');
   const [kraLocalFilter, setKraLocalFilter] = useState('');
   const [digiLocalFilter, setDigiLocalFilter] = useState('');
+  const [selectedKeys, setSelectedKeys] = useState(new Set());
 
   const updateFilter = (key, value) => {
     setFilters(current => ({ ...current, [key]: value }));
@@ -276,8 +421,13 @@ export default function Beta() {
         if (params[key] === '') delete params[key];
       });
       const response = await api.getBetaEntries(params);
-      setEntries(response?.data || []);
+      const nextEntries = response?.data || [];
+      setEntries(nextEntries);
       setSummary(response?.summary || {});
+      setSelectedKeys(current => {
+        const validKeys = new Set(nextEntries.map(getRowKey));
+        return new Set([...current].filter(key => validKeys.has(key)));
+      });
       if (response?.forbidden) setMessage(response.message || 'Admin access required.');
     } catch (error) {
       setMessage(error.message || 'Failed to load beta entries.');
@@ -304,6 +454,117 @@ export default function Beta() {
     }
     await navigator.clipboard.writeText(pans);
     setMessage(`Copied ${grouped.kra.length} KRA flow PAN(s).`);
+  };
+
+  const toggleRow = (key) => {
+    setSelectedKeys(current => {
+      const next = new Set(current);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
+
+  const toggleVisibleRows = (rowsToToggle, shouldSelect) => {
+    setSelectedKeys(current => {
+      const next = new Set(current);
+      rowsToToggle.forEach(row => {
+        const key = getRowKey(row);
+        if (shouldSelect) next.add(key);
+        else next.delete(key);
+      });
+      return next;
+    });
+  };
+
+  const clearSelectedRows = (keysToClear) => {
+    setSelectedKeys(current => {
+      const next = new Set(current);
+      keysToClear.forEach(key => next.delete(key));
+      return next;
+    });
+  };
+
+  const buildBatchPayload = (target, rows) => {
+    const applicationIds = rows.map(row => Number(row.application_id)).filter(Boolean);
+    const pans = [...new Set(rows.map(row => row.pan).filter(Boolean))];
+
+    if (target === 'cvlkra') {
+      return {
+        pans,
+        applicationIds,
+        limit: rows.length
+      };
+    }
+
+    if (target === 'cvlkra_document') {
+      return {
+        mode: 'documentUploadOnly',
+        applicationIds,
+        pans,
+        limit: rows.length,
+        reconcileFinalStatus: true
+      };
+    }
+
+    if (target === 'cdsl_status') {
+      const records = rows
+        .filter(row => row.cdsl?.id && row.cdsl?.ackId && row.cdsl?.zipFileName)
+        .map(row => ({
+          id: row.cdsl.id,
+          ackId: row.cdsl.ackId,
+          zipFileName: row.cdsl.zipFileName
+        }));
+
+      if (records.length === rows.length) {
+        return {
+          mode: 'status',
+          records
+        };
+      }
+
+      return {
+        mode: 'uploadedStatus',
+        applicationIds,
+        pans,
+        limit: rows.length,
+        minAgeMinutes: 0,
+        forceDownload: true
+      };
+    }
+
+    return {
+      mode: 'process',
+      applicationIds,
+      pans,
+      limit: rows.length
+    };
+  };
+
+  const pushSelected = async (target, rows, skippedCount = 0) => {
+    if (!rows.length) return;
+    const label = `${pushLabel(target)} for ${rows.length} selected row(s)`;
+    const skipText = skippedCount ? ` ${skippedCount} selected row(s) are not eligible and will be skipped.` : '';
+    if (!window.confirm(`Push ${label}?${skipText}`)) return;
+
+    setPushingKey(`batch:${target}`);
+    setMessage(`Sending ${label}...${skipText}`);
+    try {
+      const payload = buildBatchPayload(target, rows);
+      const firstRow = rows[0];
+      const response = await api.pushBetaEntry({
+        target,
+        applicationId: firstRow.application_id,
+        pan: firstRow.pan,
+        payload
+      });
+      setMessage(JSON.stringify(response, null, 2));
+      await loadEntries();
+    } catch (error) {
+      setMessage(error.message || `Push failed for ${label}.`);
+    } finally {
+      setPushingKey('');
+    }
   };
 
   const pushRow = async (target, row) => {
@@ -403,7 +664,13 @@ export default function Beta() {
         localFilter={kraLocalFilter}
         onLocalFilter={setKraLocalFilter}
         onPush={pushRow}
+        onPushSelected={pushSelected}
         pushingKey={pushingKey}
+        selectedKeys={selectedKeys}
+        onToggleRow={toggleRow}
+        onToggleVisibleRows={toggleVisibleRows}
+        onClearSelection={clearSelectedRows}
+        flowType="KRA"
       />
       <BetaTable
         title="DigiLocker Flow"
@@ -412,7 +679,13 @@ export default function Beta() {
         localFilter={digiLocalFilter}
         onLocalFilter={setDigiLocalFilter}
         onPush={pushRow}
+        onPushSelected={pushSelected}
         pushingKey={pushingKey}
+        selectedKeys={selectedKeys}
+        onToggleRow={toggleRow}
+        onToggleVisibleRows={toggleVisibleRows}
+        onClearSelection={clearSelectedRows}
+        flowType="DigiLocker"
       />
     </div>
   );

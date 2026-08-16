@@ -968,16 +968,16 @@ const getBetaEntries = async (req, res) => {
         cvl.sync_status AS cvlkra_status,
         cvl.error_description AS cvlkra_error,
         COALESCE(
-          cvl.api_response_payload #>> '{final_status_response,resdtls,KYC_DATA,APP_REMARKS}',
-          cvl.api_response_payload #>> '{final_status_response,resdtls,KYCDATA,APP_REMARKS}',
-          cvl.api_response_payload #>> '{resdtls,KYC_DATA,APP_REMARKS}',
-          cvl.api_response_payload #>> '{resdtls,KYCDATA,APP_REMARKS}'
+          CASE WHEN LEFT(BTRIM(cvl.api_response_payload::text), 1) = '{' THEN cvl.api_response_payload::jsonb #>> '{final_status_response,resdtls,KYC_DATA,APP_REMARKS}' END,
+          CASE WHEN LEFT(BTRIM(cvl.api_response_payload::text), 1) = '{' THEN cvl.api_response_payload::jsonb #>> '{final_status_response,resdtls,KYCDATA,APP_REMARKS}' END,
+          CASE WHEN LEFT(BTRIM(cvl.api_response_payload::text), 1) = '{' THEN cvl.api_response_payload::jsonb #>> '{resdtls,KYC_DATA,APP_REMARKS}' END,
+          CASE WHEN LEFT(BTRIM(cvl.api_response_payload::text), 1) = '{' THEN cvl.api_response_payload::jsonb #>> '{resdtls,KYCDATA,APP_REMARKS}' END
         ) AS cvlkra_remarks,
         COALESCE(
-          cvl.api_response_payload #>> '{final_status_response,resdtls,KYC_DATA,APP_ERROR_DESC}',
-          cvl.api_response_payload #>> '{final_status_response,resdtls,KYCDATA,APP_ERROR_DESC}',
-          cvl.api_response_payload #>> '{resdtls,KYC_DATA,APP_ERROR_DESC}',
-          cvl.api_response_payload #>> '{resdtls,KYCDATA,APP_ERROR_DESC}'
+          CASE WHEN LEFT(BTRIM(cvl.api_response_payload::text), 1) = '{' THEN cvl.api_response_payload::jsonb #>> '{final_status_response,resdtls,KYC_DATA,APP_ERROR_DESC}' END,
+          CASE WHEN LEFT(BTRIM(cvl.api_response_payload::text), 1) = '{' THEN cvl.api_response_payload::jsonb #>> '{final_status_response,resdtls,KYCDATA,APP_ERROR_DESC}' END,
+          CASE WHEN LEFT(BTRIM(cvl.api_response_payload::text), 1) = '{' THEN cvl.api_response_payload::jsonb #>> '{resdtls,KYC_DATA,APP_ERROR_DESC}' END,
+          CASE WHEN LEFT(BTRIM(cvl.api_response_payload::text), 1) = '{' THEN cvl.api_response_payload::jsonb #>> '{resdtls,KYCDATA,APP_ERROR_DESC}' END
         ) AS cvlkra_error_code,
         cvl.cvlkra_acknowledgment_id,
         cvl.aadhaar_xml_s3_key,

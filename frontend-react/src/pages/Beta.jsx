@@ -224,7 +224,6 @@ const targetDisabledReason = (target, row) => {
 
   if (target === 'cvlkra') {
     if (isBlockedPushPan(row.pan)) return 'Push blocked: KYC team completed KRA manually for this PAN';
-    if (directKraFlow) return 'Not needed for direct KRA flow';
     if (!isStatusPendingLike(row.cvlkra?.status)) return 'CVL KRA is not pending';
     return '';
   }
@@ -237,7 +236,6 @@ const targetDisabledReason = (target, row) => {
   }
 
   if (target === 'cvlkra_status') {
-    if (directKraFlow) return 'Not needed for direct KRA flow';
     if (!row.cvlkra?.status) return 'No CVL KRA row/status available to check';
     return '';
   }
@@ -268,7 +266,7 @@ const targetDisabledReason = (target, row) => {
 
 const batchTargetsForFlow = (flowType) => (
   flowType === 'KRA'
-    ? ['cdsl', 'cdsl_status', 'nse', 'bse', 'techexcel']
+    ? ['cvlkra', 'cvlkra_status', 'cdsl', 'cdsl_status', 'nse', 'bse', 'techexcel']
     : ['cvlkra', 'cvlkra_document', 'cvlkra_status', 'cdsl', 'cdsl_status', 'nse', 'bse', 'techexcel']
 );
 
@@ -323,7 +321,10 @@ function BetaTable({
 
     return {
       cvlkra: directKraFlow
-        ? []
+        ? [
+          makeAction('cvlkra', row, 'Push KRA', 'Submit the CVL KRA entry'),
+          makeAction('cvlkra_status', row, 'Check KRA', 'Fetch final CVL KRA status and update the DB')
+        ]
         : [
           makeAction('cvlkra', row, 'Push KRA', 'Submit the fresh CVL KRA entry'),
           makeAction('cvlkra_document', row, 'Upload Docs', 'Upload KRA PDF/XML documents'),

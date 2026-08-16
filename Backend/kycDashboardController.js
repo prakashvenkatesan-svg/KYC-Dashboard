@@ -1065,7 +1065,9 @@ const getBetaPushTarget = (target) => {
     orchestrator: process.env.BETA_ORCHESTRATOR_URL || process.env.ORCHESTRATOR_URL,
     cvlkra: process.env.BETA_CVLKRA_URL || process.env.CVLKRA_CONNECT_URL,
     cvlkra_document: process.env.BETA_CVLKRA_URL || process.env.CVLKRA_CONNECT_URL,
+    cvlkra_status: process.env.BETA_CVLKRA_URL || process.env.CVLKRA_CONNECT_URL,
     cdsl: process.env.BETA_CDSL_URL || process.env.CDSL_KYC_URL,
+    cdsl_status: process.env.BETA_CDSL_URL || process.env.CDSL_KYC_URL,
     nse: process.env.BETA_NSE_URL || process.env.NSE_CONNECT_URL,
     bse: process.env.BETA_BSE_URL || process.env.BSE_CONNECT_URL,
     techexcel: process.env.BETA_TECHEXCEL_URL || process.env.TECHEXCEL_CONNECT_URL
@@ -1092,6 +1094,26 @@ const buildDefaultBetaPushPayload = ({ target, applicationId, pan }) => {
       mode: 'documentUploadOnly',
       applicationId,
       reconcileFinalStatus: true
+    };
+  }
+
+  if (target === 'cvlkra_status') {
+    return {
+      mode: 'kraStatus',
+      applicationIds: [applicationId],
+      pans: pan ? [pan] : [],
+      limit: 1
+    };
+  }
+
+  if (target === 'cdsl_status') {
+    return {
+      mode: 'uploadedStatus',
+      applicationIds: [applicationId],
+      pans: pan ? [pan] : [],
+      limit: 1,
+      minAgeMinutes: 0,
+      forceDownload: true
     };
   }
 
@@ -1231,12 +1253,12 @@ const pushBetaEntry = async (req, res) => {
     }
 
     const { normalized, url } = getBetaPushTarget(target);
-    const allowedTargets = ['orchestrator', 'cvlkra', 'cvlkra_document', 'cdsl', 'nse', 'bse', 'techexcel'];
+    const allowedTargets = ['orchestrator', 'cvlkra', 'cvlkra_document', 'cvlkra_status', 'cdsl', 'cdsl_status', 'nse', 'bse', 'techexcel'];
     if (!allowedTargets.includes(normalized)) {
       return res.status(400).json({ success: false, message: "Unsupported push target." });
     }
 
-    const blockedPans = getBlockedPansFromPushRequest({ pan, payload });
+    const blockedPans = normalized === 'cvlkra_status' ? [] : getBlockedPansFromPushRequest({ pan, payload });
     if (blockedPans.length) {
       return res.status(409).json({
         success: false,

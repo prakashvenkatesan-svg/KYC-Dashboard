@@ -181,6 +181,7 @@ const markCdslWaitingOverride = (row) => ({
 const pushLabel = (target) => ({
   cvlkra: 'KRA Push',
   cvlkra_document: 'Doc Push',
+  cvlkra_status: 'Check KRA',
   cdsl: 'CDSL Push',
   cdsl_status: 'CDSL Check',
   nse: 'NSE Push',
@@ -191,6 +192,7 @@ const pushLabel = (target) => ({
 const loadingLabel = (target) => ({
   cvlkra: 'Pushing KRA...',
   cvlkra_document: 'Uploading docs...',
+  cvlkra_status: 'Checking KRA...',
   cdsl: 'Pushing CDSL...',
   cdsl_status: 'Checking CDSL...',
   nse: 'Pushing NSE...',
@@ -222,20 +224,28 @@ const targetDisabledReason = (target, row) => {
   const directKraFlow = row.flow_type === 'KRA';
   const cvlkraStatus = String(row.cvlkra?.status || '').toLowerCase();
 
-  if (isBlockedPushPan(row.pan)) {
-    return 'Push blocked: KYC team completed KRA manually for this PAN';
-  }
-
   if (target === 'cvlkra') {
+    if (isBlockedPushPan(row.pan)) return 'Push blocked: KYC team completed KRA manually for this PAN';
     if (directKraFlow) return 'Not needed for direct KRA flow';
     if (!isStatusPendingLike(row.cvlkra?.status)) return 'CVL KRA is not pending';
     return '';
   }
 
   if (target === 'cvlkra_document') {
+    if (isBlockedPushPan(row.pan)) return 'Push blocked: KYC team completed KRA manually for this PAN';
     if (directKraFlow) return 'Not needed for direct KRA flow';
     if (!isStatusSuccess(row.cvlkra?.status) && cvlkraStatus !== 'documents_uploaded') return 'Fresh KRA must be accepted before document upload';
     return '';
+  }
+
+  if (target === 'cvlkra_status') {
+    if (directKraFlow) return 'Not needed for direct KRA flow';
+    if (!row.cvlkra?.status) return 'No CVL KRA row/status available to check';
+    return '';
+  }
+
+  if (isBlockedPushPan(row.pan)) {
+    return 'Push blocked: KYC team completed KRA manually for this PAN';
   }
 
   if (target === 'cdsl') {
@@ -261,7 +271,7 @@ const targetDisabledReason = (target, row) => {
 const batchTargetsForFlow = (flowType) => (
   flowType === 'KRA'
     ? ['cdsl', 'cdsl_status', 'nse', 'bse', 'techexcel']
-    : ['cvlkra', 'cvlkra_document', 'cdsl', 'cdsl_status', 'nse', 'bse', 'techexcel']
+    : ['cvlkra', 'cvlkra_document', 'cvlkra_status', 'cdsl', 'cdsl_status', 'nse', 'bse', 'techexcel']
 );
 
 function BetaTable({
@@ -318,7 +328,8 @@ function BetaTable({
         ? []
         : [
           makeAction('cvlkra', row, 'Push KRA', 'Submit the fresh CVL KRA entry'),
-          makeAction('cvlkra_document', row, 'Upload Docs', 'Upload KRA PDF/XML documents')
+          makeAction('cvlkra_document', row, 'Upload Docs', 'Upload KRA PDF/XML documents'),
+          makeAction('cvlkra_status', row, 'Check KRA', 'Fetch final CVL KRA status and update the DB')
         ],
       cdsl: cdslUploaded
         ? [makeAction('cdsl_status', row, 'Check CDSL', 'Download and apply the final CDSL response')]
@@ -591,6 +602,15 @@ export default function Beta() {
         pans,
         limit: rows.length,
         reconcileFinalStatus: true
+      };
+    }
+
+    if (target === 'cvlkra_status') {
+      return {
+        mode: 'kraStatus',
+        applicationIds,
+        pans,
+        limit: rows.length
       };
     }
 

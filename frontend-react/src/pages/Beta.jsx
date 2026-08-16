@@ -44,14 +44,51 @@ const text = (value) => {
   return String(value);
 };
 
-const statusCell = (integration) => (
-  <>
-    {badge(integration?.status)}
-    <div style={{ maxWidth: 220, color: 'var(--text-muted)', fontSize: '0.75rem' }}>
-      {text(integration?.error)}
+const tableColumnStyles = {
+  pan: { width: 112 },
+  clientCode: { width: 92 },
+  application: { width: 110 },
+  name: { width: 230 },
+  stage: { width: 110 },
+  integration: { width: 250 },
+  xml: { width: 100 },
+  push: { width: 250 }
+};
+
+const statusCell = (integration) => {
+  const status = text(integration?.status);
+  const error = text(integration?.error);
+  const title = error === '-' ? status : `${status}\n${error}`;
+
+  return (
+    <div
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'flex-start',
+        gap: 4,
+        minWidth: 0,
+        maxWidth: 240
+      }}
+      title={title}
+    >
+      {badge(integration?.status)}
+      <div
+        style={{
+          width: '100%',
+          color: 'var(--text-muted)',
+          fontSize: '0.72rem',
+          lineHeight: 1.25,
+          whiteSpace: 'normal',
+          overflowWrap: 'anywhere',
+          wordBreak: 'break-word'
+        }}
+      >
+        {error}
+      </div>
     </div>
-  </>
-);
+  );
+};
 
 const includesText = (row, query) => {
   if (!query) return true;
@@ -93,21 +130,21 @@ function BetaTable({ title, description, rows, localFilter, onLocalFilter, onPus
       </div>
 
       <div style={{ overflowX: 'auto', border: '1px solid var(--border-color)', borderRadius: 8 }}>
-        <table style={{ width: '100%', minWidth: 1180, borderCollapse: 'collapse' }}>
+        <table style={{ width: '100%', minWidth: 1900, borderCollapse: 'collapse', tableLayout: 'fixed' }}>
           <thead>
             <tr>
-              <th>PAN</th>
-              <th>CC</th>
-              <th>Application</th>
-              <th>Name</th>
-              <th>Stage</th>
-              <th>CVL KRA</th>
-              <th>CDSL</th>
-              <th>NSE</th>
-              <th>BSE</th>
-              <th>TechExcel</th>
-              <th>XML</th>
-              <th>Push</th>
+              <th style={tableColumnStyles.pan}>PAN</th>
+              <th style={tableColumnStyles.clientCode}>CC</th>
+              <th style={tableColumnStyles.application}>Application</th>
+              <th style={tableColumnStyles.name}>Name</th>
+              <th style={tableColumnStyles.stage}>Stage</th>
+              <th style={tableColumnStyles.integration}>CVL KRA</th>
+              <th style={tableColumnStyles.integration}>CDSL</th>
+              <th style={tableColumnStyles.integration}>NSE</th>
+              <th style={tableColumnStyles.integration}>BSE</th>
+              <th style={tableColumnStyles.integration}>TechExcel</th>
+              <th style={tableColumnStyles.xml}>XML</th>
+              <th style={tableColumnStyles.push}>Push</th>
             </tr>
           </thead>
           <tbody>
@@ -115,18 +152,18 @@ function BetaTable({ title, description, rows, localFilter, onLocalFilter, onPus
               <tr><td colSpan="12" style={{ textAlign: 'center', padding: 18 }}>No records found.</td></tr>
             ) : filteredRows.map(row => (
               <tr key={`${row.flow_type}-${row.application_id}-${row.pan}`}>
-                <td style={{ fontFamily: 'monospace', fontWeight: 700 }}>{text(row.pan)}</td>
-                <td style={{ fontFamily: 'monospace' }}>{text(row.client_code)}</td>
-                <td>{text(row.application_id)}</td>
-                <td>{text(row.client_name)}</td>
-                <td>{text(row.current_step)}</td>
-                <td>{statusCell(row.cvlkra)}</td>
-                <td>{statusCell(row.cdsl)}</td>
-                <td>{statusCell(row.nse)}</td>
-                <td>{statusCell(row.bse)}</td>
-                <td>{statusCell(row.techexcel)}</td>
-                <td>{badge(row.xml_status)}</td>
-                <td>
+                <td style={{ ...tableColumnStyles.pan, fontFamily: 'monospace', fontWeight: 700, verticalAlign: 'top' }}>{text(row.pan)}</td>
+                <td style={{ ...tableColumnStyles.clientCode, fontFamily: 'monospace', verticalAlign: 'top' }}>{text(row.client_code)}</td>
+                <td style={{ ...tableColumnStyles.application, verticalAlign: 'top' }}>{text(row.application_id)}</td>
+                <td style={{ ...tableColumnStyles.name, verticalAlign: 'top', whiteSpace: 'normal', overflowWrap: 'anywhere' }}>{text(row.client_name)}</td>
+                <td style={{ ...tableColumnStyles.stage, verticalAlign: 'top' }}>{text(row.current_step)}</td>
+                <td style={{ ...tableColumnStyles.integration, verticalAlign: 'top' }}>{statusCell(row.cvlkra)}</td>
+                <td style={{ ...tableColumnStyles.integration, verticalAlign: 'top' }}>{statusCell(row.cdsl)}</td>
+                <td style={{ ...tableColumnStyles.integration, verticalAlign: 'top' }}>{statusCell(row.nse)}</td>
+                <td style={{ ...tableColumnStyles.integration, verticalAlign: 'top' }}>{statusCell(row.bse)}</td>
+                <td style={{ ...tableColumnStyles.integration, verticalAlign: 'top' }}>{statusCell(row.techexcel)}</td>
+                <td style={{ ...tableColumnStyles.xml, verticalAlign: 'top' }}>{badge(row.xml_status)}</td>
+                <td style={{ ...tableColumnStyles.push, verticalAlign: 'top' }}>
                   <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                     <button className="beta-secondary-btn" onClick={() => onPush('cvlkra', row)}>KRA Push</button>
                     <button className="beta-secondary-btn" onClick={() => onPush('cvlkra_document', row)}>Doc Push</button>

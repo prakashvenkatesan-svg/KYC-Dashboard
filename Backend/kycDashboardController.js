@@ -818,6 +818,7 @@ const getBetaEntries = async (req, res) => {
     const params = [];
 
     conditions.push(`ka.is_completed = true`);
+    conditions.push(`COALESCE(ka.is_test_entry, false) = false`);
 
     const flowExpr = `
       CASE
@@ -965,7 +966,10 @@ const getBetaEntries = async (req, res) => {
         COUNT(*) AS total,
         COUNT(*) FILTER (WHERE ${flowExpr} = 'KRA') AS kra_flow_count,
         COUNT(*) FILTER (WHERE ${flowExpr} = 'DigiLocker') AS digilocker_flow_count,
-        COUNT(*) FILTER (WHERE ka.is_completed = true) AS completed_count
+        COUNT(*) FILTER (
+          WHERE ka.is_completed = true
+            AND COALESCE(ka.is_test_entry, false) = false
+        ) AS completed_count
       ${baseFrom}
       ${whereClause}
     `;

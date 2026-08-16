@@ -1079,7 +1079,12 @@ const getBetaPushTarget = (target) => {
 
 const buildDefaultBetaPushPayload = ({ target, applicationId, pan }) => {
   if (target === 'cvlkra') {
-    return pan ? { pans: [pan], limit: 1 } : { applicationIds: [applicationId], limit: 1 };
+    return {
+      mode: 'process',
+      applicationIds: [applicationId],
+      pans: pan ? [pan] : [],
+      limit: 1
+    };
   }
 
   if (target === 'cvlkra_document') {

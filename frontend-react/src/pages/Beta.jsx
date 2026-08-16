@@ -90,6 +90,15 @@ const statusCell = (integration) => {
   );
 };
 
+const isCdslUploaded = (row) => String(row?.cdsl?.status || '').toLowerCase() === 'uploaded';
+
+const pushLabel = (target) => ({
+  cvlkra: 'KRA Push',
+  cvlkra_document: 'Doc Push',
+  cdsl_status: 'CDSL Check',
+  orchestrator: 'Orchestrator'
+}[target] || target);
+
 const includesText = (row, query) => {
   if (!query) return true;
   const needle = query.toLowerCase();
@@ -165,8 +174,15 @@ function BetaTable({ title, description, rows, localFilter, onLocalFilter, onPus
                 <td style={{ ...tableColumnStyles.xml, verticalAlign: 'top' }}>{badge(row.xml_status)}</td>
                 <td style={{ ...tableColumnStyles.push, verticalAlign: 'top' }}>
                   <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                    <button className="beta-secondary-btn" onClick={() => onPush('cvlkra', row)}>KRA Push</button>
-                    <button className="beta-secondary-btn" onClick={() => onPush('cvlkra_document', row)}>Doc Push</button>
+                    {row.flow_type !== 'KRA' ? (
+                      <>
+                        <button className="beta-secondary-btn" onClick={() => onPush('cvlkra', row)}>KRA Push</button>
+                        <button className="beta-secondary-btn" onClick={() => onPush('cvlkra_document', row)}>Doc Push</button>
+                      </>
+                    ) : null}
+                    {isCdslUploaded(row) ? (
+                      <button className="beta-secondary-btn" onClick={() => onPush('cdsl_status', row)}>CDSL Check</button>
+                    ) : null}
                     <button className="beta-primary-btn" onClick={() => onPush('orchestrator', row)}>Orchestrator</button>
                   </div>
                 </td>
@@ -232,14 +248,36 @@ export default function Beta() {
   };
 
   const pushRow = async (target, row) => {
-    const label = `${row.pan || row.application_id} via ${target}`;
+    const label = `${row.pan || row.application_id} via ${pushLabel(target)}`;
     if (!window.confirm(`Push ${label}?`)) return;
     setMessage(`Sending ${label}...`);
     try {
+      const payload = target === 'cdsl_status'
+        ? (
+          row.cdsl?.id && row.cdsl?.ackId && row.cdsl?.zipFileName
+            ? {
+              mode: 'status',
+              records: [{
+                id: row.cdsl.id,
+                ackId: row.cdsl.ackId,
+                zipFileName: row.cdsl.zipFileName
+              }]
+            }
+            : {
+              mode: 'uploadedStatus',
+              applicationIds: [row.application_id],
+              pans: row.pan ? [row.pan] : [],
+              limit: 1,
+              minAgeMinutes: 0,
+              forceDownload: true
+            }
+        )
+        : undefined;
       const response = await api.pushBetaEntry({
         target,
         applicationId: row.application_id,
-        pan: row.pan
+        pan: row.pan,
+        ...(payload ? { payload } : {})
       });
       setMessage(JSON.stringify(response, null, 2));
       await loadEntries();

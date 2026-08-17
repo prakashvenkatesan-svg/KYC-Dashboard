@@ -35,7 +35,9 @@ const cvlkraIssueText = (row) => [
   row?.cvlkra?.status,
   row?.cvlkra?.error,
   row?.cvlkra?.remarks,
-  row?.cvlkra?.errorCode
+  row?.cvlkra?.errorCode,
+  row?.cvlkra?.modificationStatus,
+  row?.cvlkra?.modificationStatusDate
 ].filter(Boolean).join(' ').toLowerCase();
 
 const hasKraNameMismatch = (row) => cvlkraIssueText(row).includes('name mismatch with income tax');
@@ -92,6 +94,35 @@ const hasOldKraValidated = (row) => {
   return year < 2026 || (year === 2026 && month < 7);
 };
 
+const parseIndianDate = (value) => {
+  const match = String(value || '').match(/(\d{2})[/-](\d{2})[/-](\d{4})/);
+  if (!match) return null;
+  return {
+    day: Number(match[1]),
+    month: Number(match[2]),
+    year: Number(match[3])
+  };
+};
+
+const isJuly2026OrLater = (dateParts) => (
+  Boolean(dateParts)
+  && (dateParts.year > 2026 || (dateParts.year === 2026 && dateParts.month >= 7))
+);
+
+const hasRecentModifyUnderProcess = (row) => {
+  const modificationText = [
+    row?.cvlkra?.modificationStatus,
+    row?.cvlkra?.modificationStatusDate,
+    row?.cvlkra?.error,
+    row?.cvlkra?.remarks
+  ].filter(Boolean).join(' ').toLowerCase();
+  const hasModify = modificationText.includes('modify') || modificationText.includes('modification');
+  const hasUnderProcess = modificationText.includes('under process');
+  const dateParts = parseIndianDate(row?.cvlkra?.modificationStatusDate) || parseIndianDate(modificationText);
+
+  return hasModify && hasUnderProcess && isJuly2026OrLater(dateParts);
+};
+
 const isBlankValue = (value) => value === null || value === undefined || String(value).trim() === '';
 
 const cvlkraFields = (row) => row?.cvlkra?.fields || {};
@@ -133,6 +164,14 @@ const getKraAction = (row) => {
       status: 'Do not push',
       tone: '#ef4444',
       detail: 'KYC team manually completed/blocked this PAN.'
+    };
+  }
+
+  if (hasRecentModifyUnderProcess(row)) {
+    return {
+      status: 'Do not push',
+      tone: '#ef4444',
+      detail: 'Modify KYC is already under process after July 2026.'
     };
   }
 
@@ -201,6 +240,7 @@ const getKraReadiness = (row) => {
 
   if (isBlockedPushPan(row.pan)) reasons.push('KYC/manual blocklist');
   if (hasKraNameMismatch(row)) reasons.push('Name mismatch with Income Tax');
+  if (hasRecentModifyUnderProcess(row)) reasons.push('Modify KYC under process after July 2026');
   if (row.flow_type === 'DigiLocker' && !hasValidXmlForApi(row)) reasons.push('Aadhaar XML missing/not stored');
   if (missingFields.length) reasons.push(`Missing ${missingFields.join(', ')}`);
   if (action.status !== 'KRA Push') reasons.push(action.detail);
@@ -254,6 +294,14 @@ const displayCvlkra = (row) => {
     };
   }
 
+  if (hasRecentModifyUnderProcess(row)) {
+    return {
+      ...(row.cvlkra || {}),
+      status: 'Modify_Under_Process',
+      error: row.cvlkra?.error || 'Modify KYC is already under process after July 2026.'
+    };
+  }
+
   if (hasKraXmlHold(row)) {
     return {
       ...(row.cvlkra || {}),
@@ -269,6 +317,7 @@ const statusTone = (status) => {
   const value = String(status || '').toLowerCase();
   if (['success', 'passed', 'documents_uploaded', 'uploaded', 's'].includes(value)) return '#22c55e';
   if (['name_mismatch', 'xml_hold', 'kra_xml_hold'].some(x => value.includes(x))) return '#f97316';
+  if (['modify_under_process', 'kra_modify_under_process'].some(x => value.includes(x))) return '#f97316';
   if (['pending', 'under process', 'documents uploaded'].some(x => value.includes(x))) return '#eab308';
   if (['failed', 'rejected', 'error', 'hold'].some(x => value.includes(x))) return '#ef4444';
   return '#94a3b8';
@@ -494,6 +543,7 @@ const targetDisabledReason = (target, row) => {
     if (isInternalTestPan(row.pan)) return 'Push blocked: internal/test PAN';
     if (hasKraNameMismatch(row)) return nameMismatchReason;
     if (isBlockedPushPan(row.pan)) return 'Push blocked: KYC team completed KRA manually for this PAN';
+    if (hasRecentModifyUnderProcess(row)) return 'Push blocked: Modify KYC already under process after July 2026';
     if (hasOldKraValidated(row) && row.flow_type === 'DigiLocker') return '';
     if (hasKraValidated(row)) return 'KRA is already validated';
     if (hasKraXmlHold(row)) return 'Use Doc Push for XML hold rows';
@@ -505,6 +555,7 @@ const targetDisabledReason = (target, row) => {
     if (isInternalTestPan(row.pan)) return 'Push blocked: internal/test PAN';
     if (hasKraNameMismatch(row)) return nameMismatchReason;
     if (isBlockedPushPan(row.pan)) return 'Push blocked: KYC team completed KRA manually for this PAN';
+    if (hasRecentModifyUnderProcess(row)) return 'Push blocked: Modify KYC already under process after July 2026';
     if (directKraFlow) return 'Not needed for direct KRA flow';
     if (hasKraValidated(row)) return 'KRA is already validated; document upload is not needed';
     if (hasKraXmlHold(row)) return '';

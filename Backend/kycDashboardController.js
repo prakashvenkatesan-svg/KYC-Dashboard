@@ -806,9 +806,12 @@ const classifyBetaCvlkraStatus = (row, normalizeOptionalStatus) => {
   const issueText = [
     row.cvlkra_error,
     row.cvlkra_remarks,
-    row.cvlkra_error_code
+    row.cvlkra_error_code,
+    row.cvlkra_mod_status,
+    row.cvlkra_mod_status_date
   ].filter(Boolean).join(' ').toLowerCase();
 
+  if (issueText.includes('under process') && issueText.includes('modify')) return 'KRA_Modify_Under_Process';
   if (issueText.includes('name mismatch with income tax')) return 'KRA_Name_Mismatch';
   if (
     issueText.includes('aadhaar xml file not provided') ||
@@ -979,6 +982,46 @@ const getBetaEntries = async (req, res) => {
           CASE WHEN LEFT(BTRIM(cvl.api_response_payload::text), 1) = '{' THEN cvl.api_response_payload::jsonb #>> '{resdtls,KYC_DATA,APP_ERROR_DESC}' END,
           CASE WHEN LEFT(BTRIM(cvl.api_response_payload::text), 1) = '{' THEN cvl.api_response_payload::jsonb #>> '{resdtls,KYCDATA,APP_ERROR_DESC}' END
         ) AS cvlkra_error_code,
+        COALESCE(
+          CASE WHEN LEFT(BTRIM(cvl.api_response_payload::text), 1) = '{' THEN cvl.api_response_payload::jsonb #>> '{final_status_response,resdtls,KYC_DATA,APP_UPDT_STATUS}' END,
+          CASE WHEN LEFT(BTRIM(cvl.api_response_payload::text), 1) = '{' THEN cvl.api_response_payload::jsonb #>> '{final_status_response,resdtls,KYC_DATA,APP_UPDATE_STATUS}' END,
+          CASE WHEN LEFT(BTRIM(cvl.api_response_payload::text), 1) = '{' THEN cvl.api_response_payload::jsonb #>> '{final_status_response,resdtls,KYC_DATA,APP_MOD_STATUS}' END,
+          CASE WHEN LEFT(BTRIM(cvl.api_response_payload::text), 1) = '{' THEN cvl.api_response_payload::jsonb #>> '{final_status_response,resdtls,KYC_DATA,APP_MODIFICATION_STATUS}' END,
+          CASE WHEN LEFT(BTRIM(cvl.api_response_payload::text), 1) = '{' THEN cvl.api_response_payload::jsonb #>> '{final_status_response,resdtls,KYCDATA,APP_UPDT_STATUS}' END,
+          CASE WHEN LEFT(BTRIM(cvl.api_response_payload::text), 1) = '{' THEN cvl.api_response_payload::jsonb #>> '{final_status_response,resdtls,KYCDATA,APP_UPDATE_STATUS}' END,
+          CASE WHEN LEFT(BTRIM(cvl.api_response_payload::text), 1) = '{' THEN cvl.api_response_payload::jsonb #>> '{final_status_response,resdtls,KYCDATA,APP_MOD_STATUS}' END,
+          CASE WHEN LEFT(BTRIM(cvl.api_response_payload::text), 1) = '{' THEN cvl.api_response_payload::jsonb #>> '{final_status_response,resdtls,KYCDATA,APP_MODIFICATION_STATUS}' END,
+          CASE WHEN LEFT(BTRIM(cvl.api_response_payload::text), 1) = '{' THEN cvl.api_response_payload::jsonb #>> '{resdtls,KYC_DATA,APP_UPDT_STATUS}' END,
+          CASE WHEN LEFT(BTRIM(cvl.api_response_payload::text), 1) = '{' THEN cvl.api_response_payload::jsonb #>> '{resdtls,KYC_DATA,APP_UPDATE_STATUS}' END,
+          CASE WHEN LEFT(BTRIM(cvl.api_response_payload::text), 1) = '{' THEN cvl.api_response_payload::jsonb #>> '{resdtls,KYC_DATA,APP_MOD_STATUS}' END,
+          CASE WHEN LEFT(BTRIM(cvl.api_response_payload::text), 1) = '{' THEN cvl.api_response_payload::jsonb #>> '{resdtls,KYC_DATA,APP_MODIFICATION_STATUS}' END,
+          CASE WHEN LEFT(BTRIM(cvl.api_response_payload::text), 1) = '{' THEN cvl.api_response_payload::jsonb #>> '{resdtls,KYCDATA,APP_UPDT_STATUS}' END,
+          CASE WHEN LEFT(BTRIM(cvl.api_response_payload::text), 1) = '{' THEN cvl.api_response_payload::jsonb #>> '{resdtls,KYCDATA,APP_UPDATE_STATUS}' END,
+          CASE WHEN LEFT(BTRIM(cvl.api_response_payload::text), 1) = '{' THEN cvl.api_response_payload::jsonb #>> '{resdtls,KYCDATA,APP_MOD_STATUS}' END,
+          CASE WHEN LEFT(BTRIM(cvl.api_response_payload::text), 1) = '{' THEN cvl.api_response_payload::jsonb #>> '{resdtls,KYCDATA,APP_MODIFICATION_STATUS}' END
+        ) AS cvlkra_mod_status,
+        COALESCE(
+          CASE WHEN LEFT(BTRIM(cvl.api_response_payload::text), 1) = '{' THEN cvl.api_response_payload::jsonb #>> '{final_status_response,resdtls,KYC_DATA,APP_UPDT_STATUSDT}' END,
+          CASE WHEN LEFT(BTRIM(cvl.api_response_payload::text), 1) = '{' THEN cvl.api_response_payload::jsonb #>> '{final_status_response,resdtls,KYC_DATA,APP_UPDATE_STATUSDT}' END,
+          CASE WHEN LEFT(BTRIM(cvl.api_response_payload::text), 1) = '{' THEN cvl.api_response_payload::jsonb #>> '{final_status_response,resdtls,KYC_DATA,APP_MOD_STATUSDT}' END,
+          CASE WHEN LEFT(BTRIM(cvl.api_response_payload::text), 1) = '{' THEN cvl.api_response_payload::jsonb #>> '{final_status_response,resdtls,KYC_DATA,APP_MODIFICATION_STATUSDT}' END,
+          CASE WHEN LEFT(BTRIM(cvl.api_response_payload::text), 1) = '{' THEN cvl.api_response_payload::jsonb #>> '{final_status_response,resdtls,KYC_DATA,APP_MODDT}' END,
+          CASE WHEN LEFT(BTRIM(cvl.api_response_payload::text), 1) = '{' THEN cvl.api_response_payload::jsonb #>> '{final_status_response,resdtls,KYCDATA,APP_UPDT_STATUSDT}' END,
+          CASE WHEN LEFT(BTRIM(cvl.api_response_payload::text), 1) = '{' THEN cvl.api_response_payload::jsonb #>> '{final_status_response,resdtls,KYCDATA,APP_UPDATE_STATUSDT}' END,
+          CASE WHEN LEFT(BTRIM(cvl.api_response_payload::text), 1) = '{' THEN cvl.api_response_payload::jsonb #>> '{final_status_response,resdtls,KYCDATA,APP_MOD_STATUSDT}' END,
+          CASE WHEN LEFT(BTRIM(cvl.api_response_payload::text), 1) = '{' THEN cvl.api_response_payload::jsonb #>> '{final_status_response,resdtls,KYCDATA,APP_MODIFICATION_STATUSDT}' END,
+          CASE WHEN LEFT(BTRIM(cvl.api_response_payload::text), 1) = '{' THEN cvl.api_response_payload::jsonb #>> '{final_status_response,resdtls,KYCDATA,APP_MODDT}' END,
+          CASE WHEN LEFT(BTRIM(cvl.api_response_payload::text), 1) = '{' THEN cvl.api_response_payload::jsonb #>> '{resdtls,KYC_DATA,APP_UPDT_STATUSDT}' END,
+          CASE WHEN LEFT(BTRIM(cvl.api_response_payload::text), 1) = '{' THEN cvl.api_response_payload::jsonb #>> '{resdtls,KYC_DATA,APP_UPDATE_STATUSDT}' END,
+          CASE WHEN LEFT(BTRIM(cvl.api_response_payload::text), 1) = '{' THEN cvl.api_response_payload::jsonb #>> '{resdtls,KYC_DATA,APP_MOD_STATUSDT}' END,
+          CASE WHEN LEFT(BTRIM(cvl.api_response_payload::text), 1) = '{' THEN cvl.api_response_payload::jsonb #>> '{resdtls,KYC_DATA,APP_MODIFICATION_STATUSDT}' END,
+          CASE WHEN LEFT(BTRIM(cvl.api_response_payload::text), 1) = '{' THEN cvl.api_response_payload::jsonb #>> '{resdtls,KYC_DATA,APP_MODDT}' END,
+          CASE WHEN LEFT(BTRIM(cvl.api_response_payload::text), 1) = '{' THEN cvl.api_response_payload::jsonb #>> '{resdtls,KYCDATA,APP_UPDT_STATUSDT}' END,
+          CASE WHEN LEFT(BTRIM(cvl.api_response_payload::text), 1) = '{' THEN cvl.api_response_payload::jsonb #>> '{resdtls,KYCDATA,APP_UPDATE_STATUSDT}' END,
+          CASE WHEN LEFT(BTRIM(cvl.api_response_payload::text), 1) = '{' THEN cvl.api_response_payload::jsonb #>> '{resdtls,KYCDATA,APP_MOD_STATUSDT}' END,
+          CASE WHEN LEFT(BTRIM(cvl.api_response_payload::text), 1) = '{' THEN cvl.api_response_payload::jsonb #>> '{resdtls,KYCDATA,APP_MODIFICATION_STATUSDT}' END,
+          CASE WHEN LEFT(BTRIM(cvl.api_response_payload::text), 1) = '{' THEN cvl.api_response_payload::jsonb #>> '{resdtls,KYCDATA,APP_MODDT}' END
+        ) AS cvlkra_mod_status_date,
         cvl.cvlkra_acknowledgment_id,
         cvl.aadhaar_xml_s3_key,
         cvl.app_occ,
@@ -1050,6 +1093,8 @@ const getBetaEntries = async (req, res) => {
         error: [row.cvlkra_remarks, row.cvlkra_error].filter(Boolean).join(' | ') || null,
         errorCode: row.cvlkra_error_code,
         remarks: row.cvlkra_remarks,
+        modificationStatus: row.cvlkra_mod_status,
+        modificationStatusDate: row.cvlkra_mod_status_date,
         acknowledgmentId: row.cvlkra_acknowledgment_id,
         fields: {
           appOcc: row.app_occ,

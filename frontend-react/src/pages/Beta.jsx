@@ -42,6 +42,134 @@ const hasKraXmlHold = (row) => {
   );
 };
 
+const hasValidXmlForApi = (row) => {
+  const status = String(row?.xml_status || '').toLowerCase();
+  return status.includes('stored') || status.includes('raw xml');
+};
+
+const hasKraNotAvailable = (row) => {
+  const issueText = cvlkraIssueText(row);
+  return (
+    issueText.includes('not available (005)') ||
+    issueText.includes('status: not available') ||
+    issueText.includes('kra_not_accepted') ||
+    issueText.includes('not_accepted') ||
+    issueText.includes('err-90029') ||
+    issueText.includes('app_status err-90029')
+  );
+};
+
+const hasErr90029 = (row) => cvlkraIssueText(row).includes('err-90029');
+
+const hasKraValidated = (row) => {
+  const issueText = cvlkraIssueText(row);
+  const status = String(row?.cvlkra?.status || '').toLowerCase();
+  return (
+    status.includes('validated') ||
+    issueText.includes('kra validated') ||
+    issueText.includes('new kyc validated') ||
+    issueText.includes('final cvlkra kyc status: kra validated (007)') ||
+    issueText.includes('final cvlkra kyc status: validated (007)')
+  );
+};
+
+const hasOldKraValidated = (row) => {
+  if (!hasKraValidated(row)) return false;
+  const issueText = cvlkraIssueText(row);
+  const match = issueText.match(/as of\s+(\d{2})\/(\d{2})\/(\d{4})/);
+  if (!match) return false;
+  const [, , month, year] = match.map(Number);
+  return year < 2026 || (year === 2026 && month < 7);
+};
+
+const getKraAction = (row) => {
+  if (hasKraNameMismatch(row)) {
+    return {
+      status: 'Do not push',
+      tone: '#ef4444',
+      detail: 'Name mismatch. Client consent/correction needed.'
+    };
+  }
+
+  if (isBlockedPushPan(row.pan)) {
+    return {
+      status: 'Do not push',
+      tone: '#ef4444',
+      detail: 'KYC team manually completed/blocked this PAN.'
+    };
+  }
+
+  if (hasOldKraValidated(row)) {
+    return {
+      status: 'KRA valid',
+      tone: '#16a34a',
+      detail: 'Old KRA validated. No KRA push required.'
+    };
+  }
+
+  if (hasKraValidated(row)) {
+    return {
+      status: 'KRA valid',
+      tone: '#16a34a',
+      detail: 'KRA accepted. Continue downstream checks/pushes.'
+    };
+  }
+
+  if (hasKraXmlHold(row)) {
+    return {
+      status: 'Doc Push only',
+      tone: '#2563eb',
+      detail: hasValidXmlForApi(row)
+        ? 'Fresh KRA exists; upload XML/PDF only.'
+        : 'Fresh KRA exists; upload docs only. Verify XML exists in S3 if it fails.'
+    };
+  }
+
+  if (hasErr90029(row)) {
+    return {
+      status: 'KRA Push',
+      tone: '#2563eb',
+      detail: 'ERR-90029. Push after income/occupation/proofs are fixed.'
+    };
+  }
+
+  if (hasKraNotAvailable(row)) {
+    return {
+      status: 'KRA Push',
+      tone: '#2563eb',
+      detail: 'KRA not available. Submit fresh API KRA.'
+    };
+  }
+
+  return {
+    status: 'Check KRA',
+    tone: '#64748b',
+    detail: 'Fetch latest KRA status before deciding.'
+  };
+};
+
+const actionBadge = ({ status, tone, detail }) => (
+  <div title={detail} style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-start' }}>
+    <span
+      style={{
+        display: 'inline-flex',
+        padding: '3px 9px',
+        borderRadius: 999,
+        background: `${tone}22`,
+        color: tone,
+        fontSize: '0.75rem',
+        fontWeight: 800,
+        whiteSpace: 'nowrap'
+      }}
+    >
+      {status}
+    </span>
+    <span style={{ color: 'var(--text-muted)', fontSize: '0.72rem', lineHeight: 1.25, overflowWrap: 'anywhere' }}>
+      {detail}
+    </span>
+  </div>
+);
+
 const displayCvlkra = (row) => {
   if (hasKraNameMismatch(row)) {
     return {
@@ -105,6 +233,7 @@ const tableColumnStyles = {
   name: { width: 230 },
   stage: { width: 110 },
   integration: { width: 260 },
+  kraAction: { width: 220 },
   xml: { width: 100 }
 };
 
@@ -289,6 +418,8 @@ const targetDisabledReason = (target, row) => {
   if (target === 'cvlkra') {
     if (hasKraNameMismatch(row)) return nameMismatchReason;
     if (isBlockedPushPan(row.pan)) return 'Push blocked: KYC team completed KRA manually for this PAN';
+    if (hasKraValidated(row)) return 'KRA is already validated';
+    if (hasKraXmlHold(row)) return 'Use Doc Push for XML hold rows';
     if (!isStatusPendingLike(row.cvlkra?.status)) return 'CVL KRA is not pending';
     return '';
   }
@@ -297,6 +428,8 @@ const targetDisabledReason = (target, row) => {
     if (hasKraNameMismatch(row)) return nameMismatchReason;
     if (isBlockedPushPan(row.pan)) return 'Push blocked: KYC team completed KRA manually for this PAN';
     if (directKraFlow) return 'Not needed for direct KRA flow';
+    if (hasKraValidated(row)) return 'KRA is already validated; document upload is not needed';
+    if (hasKraXmlHold(row)) return '';
     if (!isStatusSuccess(row.cvlkra?.status) && cvlkraStatus !== 'documents_uploaded') return 'Fresh KRA must be accepted before document upload';
     return '';
   }
@@ -475,7 +608,7 @@ function BetaTable({
       </div>
 
       <div style={{ overflowX: 'auto', border: '1px solid var(--border-color)', borderRadius: 8 }}>
-        <table style={{ width: '100%', minWidth: 1810, borderCollapse: 'collapse', tableLayout: 'fixed' }}>
+        <table style={{ width: '100%', minWidth: 2030, borderCollapse: 'collapse', tableLayout: 'fixed' }}>
           <thead>
             <tr>
               <th style={tableColumnStyles.select}>
@@ -492,6 +625,7 @@ function BetaTable({
               <th style={tableColumnStyles.application}>Application</th>
               <th style={tableColumnStyles.name}>Name</th>
               <th style={tableColumnStyles.stage}>Stage</th>
+              <th style={tableColumnStyles.kraAction}>KRA Action</th>
               <th style={tableColumnStyles.integration}>CVL KRA</th>
               <th style={tableColumnStyles.integration}>CDSL</th>
               <th style={tableColumnStyles.integration}>NSE</th>
@@ -502,10 +636,11 @@ function BetaTable({
           </thead>
           <tbody>
             {filteredRows.length === 0 ? (
-              <tr><td colSpan="12" style={{ textAlign: 'center', padding: 18 }}>No records found.</td></tr>
+              <tr><td colSpan="13" style={{ textAlign: 'center', padding: 18 }}>No records found.</td></tr>
             ) : filteredRows.map(row => {
               const actions = rowActions(row);
               const key = getRowKey(row);
+              const kraAction = getKraAction(row);
               return (
                 <tr key={key}>
                   <td style={{ ...tableColumnStyles.select, verticalAlign: 'top' }}>
@@ -522,6 +657,7 @@ function BetaTable({
                   <td style={{ ...tableColumnStyles.application, verticalAlign: 'top' }}>{text(row.application_id)}</td>
                   <td style={{ ...tableColumnStyles.name, verticalAlign: 'top', whiteSpace: 'normal', overflowWrap: 'anywhere' }}>{text(row.client_name)}</td>
                   <td style={{ ...tableColumnStyles.stage, verticalAlign: 'top' }}>{text(row.current_step)}</td>
+                  <td style={{ ...tableColumnStyles.kraAction, verticalAlign: 'top' }}>{actionBadge(kraAction)}</td>
                   <td style={{ ...tableColumnStyles.integration, verticalAlign: 'top' }}>{statusCell(displayCvlkra(row), actions.cvlkra)}</td>
                   <td style={{ ...tableColumnStyles.integration, verticalAlign: 'top' }}>{statusCell(row.cdsl, actions.cdsl)}</td>
                   <td style={{ ...tableColumnStyles.integration, verticalAlign: 'top' }}>{statusCell(row.nse, actions.nse)}</td>
@@ -604,6 +740,26 @@ export default function Beta() {
     const kra = displayEntries.filter(row => row.flow_type === 'KRA');
     const digilocker = displayEntries.filter(row => row.flow_type === 'DigiLocker');
     return { kra, digilocker };
+  }, [displayEntries]);
+
+  const kraActionSummary = useMemo(() => {
+    const initial = {
+      kraPush: 0,
+      docPushOnly: 0,
+      kraValid: 0,
+      doNotPush: 0,
+      checkKra: 0
+    };
+
+    return displayEntries.reduce((counts, row) => {
+      const action = getKraAction(row).status;
+      if (action === 'KRA Push') counts.kraPush += 1;
+      else if (action === 'Doc Push only') counts.docPushOnly += 1;
+      else if (action === 'KRA valid') counts.kraValid += 1;
+      else if (action === 'Do not push') counts.doNotPush += 1;
+      else counts.checkKra += 1;
+      return counts;
+    }, initial);
   }, [displayEntries]);
 
   const copyKraPans = async () => {
@@ -810,6 +966,10 @@ export default function Beta() {
         <div className="beta-section"><div style={{ color: 'var(--text-muted)', fontSize: '0.78rem' }}>KRA Flow</div><strong>{summary.kra_flow_count ?? grouped.kra.length}</strong></div>
         <div className="beta-section"><div style={{ color: 'var(--text-muted)', fontSize: '0.78rem' }}>DigiLocker Flow</div><strong>{summary.digilocker_flow_count ?? grouped.digilocker.length}</strong></div>
         <div className="beta-section"><div style={{ color: 'var(--text-muted)', fontSize: '0.78rem' }}>Completed</div><strong>{summary.completed_count ?? summary.total ?? entries.length}</strong></div>
+        <div className="beta-section"><div style={{ color: 'var(--text-muted)', fontSize: '0.78rem' }}>KRA Push</div><strong>{kraActionSummary.kraPush}</strong></div>
+        <div className="beta-section"><div style={{ color: 'var(--text-muted)', fontSize: '0.78rem' }}>Doc Push Only</div><strong>{kraActionSummary.docPushOnly}</strong></div>
+        <div className="beta-section"><div style={{ color: 'var(--text-muted)', fontSize: '0.78rem' }}>KRA Valid</div><strong>{kraActionSummary.kraValid}</strong></div>
+        <div className="beta-section"><div style={{ color: 'var(--text-muted)', fontSize: '0.78rem' }}>Do Not Push</div><strong>{kraActionSummary.doNotPush}</strong></div>
       </div>
 
       {message ? (

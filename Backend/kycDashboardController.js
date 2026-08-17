@@ -801,17 +801,56 @@ const mapBetaFlowType = (row) => {
   return 'Unknown';
 };
 
+const betaCvlkraIssueText = (row) => [
+  row.cvlkra_error,
+  row.cvlkra_remarks,
+  row.cvlkra_error_code,
+  row.cvlkra_mod_status,
+  row.cvlkra_mod_status_date,
+  row.cvlkra_response_text
+].filter(Boolean).join(' ');
+
+const parseBetaIndianDate = (value) => {
+  const match = String(value || '').match(/(\d{2})[/-](\d{2})[/-](\d{4})/);
+  if (!match) return null;
+  return {
+    raw: match[0],
+    day: Number(match[1]),
+    month: Number(match[2]),
+    year: Number(match[3])
+  };
+};
+
+const isBetaJuly2026OrLater = (dateParts) => (
+  Boolean(dateParts)
+  && (dateParts.year > 2026 || (dateParts.year === 2026 && dateParts.month >= 7))
+);
+
+const extractRecentModifyStatusDate = (row) => {
+  const explicitDate = parseBetaIndianDate(row.cvlkra_mod_status_date);
+  if (isBetaJuly2026OrLater(explicitDate)) return explicitDate.raw;
+
+  const text = betaCvlkraIssueText(row);
+  const matches = [...String(text || '').matchAll(/(\d{2})[/-](\d{2})[/-](\d{4})/g)]
+    .map(match => parseBetaIndianDate(match[0]))
+    .filter(Boolean);
+
+  const recentDate = matches.find(isBetaJuly2026OrLater);
+  return recentDate?.raw || null;
+};
+
+const hasRecentModifyUnderProcessStatus = (row) => {
+  const issueText = betaCvlkraIssueText(row).toLowerCase();
+  const hasModify = issueText.includes('modify') || issueText.includes('modification');
+  const hasUnderProcess = issueText.includes('under process');
+  return hasModify && hasUnderProcess && Boolean(extractRecentModifyStatusDate(row));
+};
+
 const classifyBetaCvlkraStatus = (row, normalizeOptionalStatus) => {
   const normalizedStatus = normalizeOptionalStatus(row.cvlkra_status);
-  const issueText = [
-    row.cvlkra_error,
-    row.cvlkra_remarks,
-    row.cvlkra_error_code,
-    row.cvlkra_mod_status,
-    row.cvlkra_mod_status_date
-  ].filter(Boolean).join(' ').toLowerCase();
+  const issueText = betaCvlkraIssueText(row).toLowerCase();
 
-  if (issueText.includes('under process') && issueText.includes('modify')) return 'KRA_Modify_Under_Process';
+  if (hasRecentModifyUnderProcessStatus(row)) return 'KRA_Modify_Under_Process';
   if (issueText.includes('name mismatch with income tax')) return 'KRA_Name_Mismatch';
   if (
     issueText.includes('aadhaar xml file not provided') ||
@@ -1022,6 +1061,7 @@ const getBetaEntries = async (req, res) => {
           CASE WHEN LEFT(BTRIM(cvl.api_response_payload::text), 1) = '{' THEN cvl.api_response_payload::jsonb #>> '{resdtls,KYCDATA,APP_MODIFICATION_STATUSDT}' END,
           CASE WHEN LEFT(BTRIM(cvl.api_response_payload::text), 1) = '{' THEN cvl.api_response_payload::jsonb #>> '{resdtls,KYCDATA,APP_MODDT}' END
         ) AS cvlkra_mod_status_date,
+        LEFT(COALESCE(cvl.api_response_payload::text, ''), 20000) AS cvlkra_response_text,
         cvl.cvlkra_acknowledgment_id,
         cvl.aadhaar_xml_s3_key,
         cvl.app_occ,
@@ -1079,22 +1119,27 @@ const getBetaEntries = async (req, res) => {
     ]);
 
     const normalizeOptionalStatus = (status) => status ? normalizeStatus(status) : null;
-    const data = dataResult.rows.map(row => ({
+    const data = dataResult.rows.map(row => {
+      const cvlkraStatus = classifyBetaCvlkraStatus(row, normalizeOptionalStatus);
+      const recentModifyStatus = hasRecentModifyUnderProcessStatus(row) ? 'UNDER PROCESS - Modify KYC' : null;
+      const recentModifyDate = extractRecentModifyStatusDate(row);
+
+      return {
       ...row,
       flow_type: mapBetaFlowType(row),
-      cvlkra_status: classifyBetaCvlkraStatus(row, normalizeOptionalStatus),
+      cvlkra_status: cvlkraStatus,
       cdsl_push_status: normalizeOptionalStatus(row.cdsl_push_status),
       nse_push_status: normalizeOptionalStatus(row.nse_push_status),
       bse_status: normalizeOptionalStatus(row.bse_status),
       techexcel_push_status: normalizeOptionalStatus(row.techexcel_push_status),
       cvlkra: {
         id: row.cvlkra_id,
-        status: classifyBetaCvlkraStatus(row, normalizeOptionalStatus),
+        status: cvlkraStatus,
         error: [row.cvlkra_remarks, row.cvlkra_error].filter(Boolean).join(' | ') || null,
         errorCode: row.cvlkra_error_code,
         remarks: row.cvlkra_remarks,
-        modificationStatus: row.cvlkra_mod_status,
-        modificationStatusDate: row.cvlkra_mod_status_date,
+        modificationStatus: row.cvlkra_mod_status || recentModifyStatus,
+        modificationStatusDate: row.cvlkra_mod_status_date || recentModifyDate,
         acknowledgmentId: row.cvlkra_acknowledgment_id,
         fields: {
           appOcc: row.app_occ,
@@ -1126,7 +1171,8 @@ const getBetaEntries = async (req, res) => {
         clientId: row.techexcel_client_id,
         status: normalizeOptionalStatus(row.techexcel_push_status)
       }
-    }));
+      };
+    });
 
     return res.status(200).json({
       success: true,

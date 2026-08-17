@@ -32,9 +32,6 @@ export default function Sidebar() {
         <NavLink to="/clients" className="nav-link" end>
           <i className="icon">&#128101;</i> Clients
         </NavLink>
-        <NavLink to="/beta" className="nav-link">
-          <i className="icon" style={{ fontStyle: 'normal' }}>&#946;</i> Beta
-        </NavLink>
         <NavLink to="/payments" className="nav-link">
           <i className="icon" style={{ fontStyle: 'normal' }}>&#128179;</i> Payments
         </NavLink>

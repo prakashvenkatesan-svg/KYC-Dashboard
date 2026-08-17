@@ -23,7 +23,13 @@ const blockedPushPans = new Set([
   'ALQPN5323G'
 ]);
 
+const internalTestPans = new Set([
+  'HJEPM7970R',
+  'PHQPK0909C'
+]);
+
 const isBlockedPushPan = (pan) => blockedPushPans.has(String(pan || '').trim().toUpperCase());
+const isInternalTestPan = (pan) => internalTestPans.has(String(pan || '').trim().toUpperCase());
 
 const cvlkraIssueText = (row) => [
   row?.cvlkra?.status,
@@ -106,6 +112,14 @@ const missingCvlkraFields = (row) => {
 };
 
 const getKraAction = (row) => {
+  if (isInternalTestPan(row.pan)) {
+    return {
+      status: 'Do not push',
+      tone: '#ef4444',
+      detail: 'Internal/test PAN. Hidden from operational push list.'
+    };
+  }
+
   if (hasKraNameMismatch(row)) {
     return {
       status: 'Do not push',
@@ -194,6 +208,7 @@ const getKraReadiness = (row) => {
 
   const uniqueReasons = [...new Set(reasons.filter(Boolean))];
   const canPush = action.status === 'KRA Push'
+    && !isInternalTestPan(row.pan)
     && !disabledReason
     && missingFields.length === 0
     && (row.flow_type !== 'DigiLocker' || hasValidXmlForApi(row));
@@ -476,6 +491,7 @@ const targetDisabledReason = (target, row) => {
   const nameMismatchReason = 'Name mismatch with Income Tax. Do not push without client consent.';
 
   if (target === 'cvlkra') {
+    if (isInternalTestPan(row.pan)) return 'Push blocked: internal/test PAN';
     if (hasKraNameMismatch(row)) return nameMismatchReason;
     if (isBlockedPushPan(row.pan)) return 'Push blocked: KYC team completed KRA manually for this PAN';
     if (hasOldKraValidated(row) && row.flow_type === 'DigiLocker') return '';
@@ -486,6 +502,7 @@ const targetDisabledReason = (target, row) => {
   }
 
   if (target === 'cvlkra_document') {
+    if (isInternalTestPan(row.pan)) return 'Push blocked: internal/test PAN';
     if (hasKraNameMismatch(row)) return nameMismatchReason;
     if (isBlockedPushPan(row.pan)) return 'Push blocked: KYC team completed KRA manually for this PAN';
     if (directKraFlow) return 'Not needed for direct KRA flow';
@@ -496,8 +513,13 @@ const targetDisabledReason = (target, row) => {
   }
 
   if (target === 'cvlkra_status') {
+    if (isInternalTestPan(row.pan)) return 'Internal/test PAN hidden from operational status checks';
     if (!row.cvlkra?.status) return 'No CVL KRA row/status available to check';
     return '';
+  }
+
+  if (isInternalTestPan(row.pan)) {
+    return 'Push blocked: internal/test PAN';
   }
 
   if (isBlockedPushPan(row.pan)) {
@@ -743,6 +765,11 @@ function KraReadinessPanel({
   onLocalFilter,
   onCopy,
   onPush,
+  onPushSelected,
+  selectedKeys,
+  onToggleRow,
+  onToggleVisibleRows,
+  onClearSelection,
   pushingKey
 }) {
   const activeRows = rowsByTab[activeTab] || [];
@@ -764,6 +791,18 @@ function KraReadinessPanel({
       ].some(value => String(value || '').toLowerCase().includes(query));
     });
   }, [activeRows, localFilter]);
+  const filteredKeys = useMemo(() => filteredRows.map(getRowKey), [filteredRows]);
+  const selectedRows = useMemo(
+    () => filteredRows.filter(row => selectedKeys.has(getRowKey(row))),
+    [filteredRows, selectedKeys]
+  );
+  const selectedCount = selectedRows.length;
+  const allVisibleSelected = filteredKeys.length > 0 && filteredKeys.every(key => selectedKeys.has(key));
+  const selectedPushableRows = selectedRows.filter(row => {
+    const readiness = row.kraReadiness || getKraReadiness(row);
+    return readiness.canPush && !targetDisabledReason('cvlkra', row);
+  });
+  const bulkPushDisabled = selectedPushableRows.length === 0 || Boolean(pushingKey);
 
   const renderPushButton = (row) => {
     const readiness = row.kraReadiness || getKraReadiness(row);
@@ -831,15 +870,46 @@ function KraReadinessPanel({
           placeholder="Filter readiness list"
           style={{ minWidth: 260, padding: '9px 10px', borderRadius: 6, border: '1px solid var(--border-color)', background: 'var(--bg-color)', color: 'var(--text-primary)' }}
         />
-        <div style={{ color: 'var(--text-secondary)', fontSize: '0.86rem', fontWeight: 700 }}>
-          Showing {filteredRows.length} of {activeRows.length}
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+          <span style={{ color: 'var(--text-secondary)', fontSize: '0.86rem', fontWeight: 700 }}>
+            Showing {filteredRows.length} of {activeRows.length}; {selectedCount} selected
+          </span>
+          <button
+            className="beta-primary-btn"
+            disabled={bulkPushDisabled}
+            onClick={() => onPushSelected('cvlkra', selectedPushableRows, selectedCount - selectedPushableRows.length)}
+            title={selectedPushableRows.length ? `KRA Push for ${selectedPushableRows.length} selected row(s)` : 'No selected rows are ready for KRA push'}
+            style={{
+              padding: '7px 10px',
+              fontSize: '0.78rem',
+              opacity: bulkPushDisabled ? 0.48 : 1,
+              background: bulkPushDisabled ? 'var(--subtle-surface)' : '#16a34a',
+              borderColor: bulkPushDisabled ? 'var(--surface-border)' : '#15803d',
+              color: bulkPushDisabled ? 'var(--text-muted)' : '#fff',
+              boxShadow: bulkPushDisabled ? 'none' : '0 2px 8px rgba(22, 163, 74, 0.28)'
+            }}
+          >
+            {pushingKey === 'batch:cvlkra' ? loadingLabel('cvlkra') : `KRA Push selected (${selectedPushableRows.length})`}
+          </button>
+          <button className="beta-secondary-btn" onClick={() => onClearSelection(filteredKeys)} disabled={!selectedCount || Boolean(pushingKey)}>
+            Clear
+          </button>
         </div>
       </div>
 
       <div style={{ overflowX: 'auto', border: '1px solid var(--border-color)', borderRadius: 8 }}>
-        <table style={{ width: '100%', minWidth: 1340, borderCollapse: 'collapse', tableLayout: 'fixed' }}>
+        <table style={{ width: '100%', minWidth: 1400, borderCollapse: 'collapse', tableLayout: 'fixed' }}>
           <thead>
             <tr>
+              <th style={tableColumnStyles.select}>
+                <input
+                  type="checkbox"
+                  checked={allVisibleSelected}
+                  disabled={!filteredRows.length || Boolean(pushingKey)}
+                  onChange={event => onToggleVisibleRows(filteredRows, event.target.checked)}
+                  aria-label="Select all visible readiness rows"
+                />
+              </th>
               <th style={tableColumnStyles.pan}>PAN</th>
               <th style={tableColumnStyles.clientCode}>CC</th>
               <th style={tableColumnStyles.application}>Application</th>
@@ -854,11 +924,21 @@ function KraReadinessPanel({
           </thead>
           <tbody>
             {filteredRows.length === 0 ? (
-              <tr><td colSpan="10" style={{ textAlign: 'center', padding: 18 }}>No records found.</td></tr>
+              <tr><td colSpan="11" style={{ textAlign: 'center', padding: 18 }}>No records found.</td></tr>
             ) : filteredRows.map(row => {
               const readiness = row.kraReadiness || getKraReadiness(row);
+              const key = getRowKey(row);
               return (
-                <tr key={`readiness-${getRowKey(row)}`}>
+                <tr key={`readiness-${key}`}>
+                  <td style={{ ...tableColumnStyles.select, verticalAlign: 'top' }}>
+                    <input
+                      type="checkbox"
+                      checked={selectedKeys.has(key)}
+                      disabled={Boolean(pushingKey)}
+                      onChange={() => onToggleRow(key)}
+                      aria-label={`Select ${row.pan || row.application_id}`}
+                    />
+                  </td>
                   <td style={{ ...tableColumnStyles.pan, fontFamily: 'monospace', fontWeight: 700, verticalAlign: 'top' }}>{text(row.pan)}</td>
                   <td style={{ ...tableColumnStyles.clientCode, fontFamily: 'monospace', verticalAlign: 'top' }}>{text(row.client_code)}</td>
                   <td style={{ ...tableColumnStyles.application, verticalAlign: 'top' }}>{text(row.application_id)}</td>
@@ -941,6 +1021,7 @@ export default function Beta() {
   const displayEntries = useMemo(
     () => entries
       .map(row => applyRowOverrides(row, rowOverrides))
+      .filter(row => !isInternalTestPan(row.pan))
       .filter(row => includesText(row, filters.q)),
     [entries, rowOverrides, filters.q]
   );
@@ -1196,10 +1277,10 @@ export default function Beta() {
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, margin: '16px 0' }}>
-        <div className="beta-section"><div style={{ color: 'var(--text-muted)', fontSize: '0.78rem' }}>Total</div><strong>{summary.total || entries.length}</strong></div>
-        <div className="beta-section"><div style={{ color: 'var(--text-muted)', fontSize: '0.78rem' }}>KRA Flow</div><strong>{summary.kra_flow_count ?? grouped.kra.length}</strong></div>
-        <div className="beta-section"><div style={{ color: 'var(--text-muted)', fontSize: '0.78rem' }}>DigiLocker Flow</div><strong>{summary.digilocker_flow_count ?? grouped.digilocker.length}</strong></div>
-        <div className="beta-section"><div style={{ color: 'var(--text-muted)', fontSize: '0.78rem' }}>Completed</div><strong>{summary.completed_count ?? summary.total ?? entries.length}</strong></div>
+        <div className="beta-section"><div style={{ color: 'var(--text-muted)', fontSize: '0.78rem' }}>Total</div><strong>{displayEntries.length}</strong></div>
+        <div className="beta-section"><div style={{ color: 'var(--text-muted)', fontSize: '0.78rem' }}>KRA Flow</div><strong>{grouped.kra.length}</strong></div>
+        <div className="beta-section"><div style={{ color: 'var(--text-muted)', fontSize: '0.78rem' }}>DigiLocker Flow</div><strong>{grouped.digilocker.length}</strong></div>
+        <div className="beta-section"><div style={{ color: 'var(--text-muted)', fontSize: '0.78rem' }}>Completed</div><strong>{displayEntries.length}</strong></div>
         <div className="beta-section"><div style={{ color: 'var(--text-muted)', fontSize: '0.78rem' }}>KRA Push</div><strong>{kraActionSummary.kraPush}</strong></div>
         <div className="beta-section"><div style={{ color: 'var(--text-muted)', fontSize: '0.78rem' }}>Doc Push Only</div><strong>{kraActionSummary.docPushOnly}</strong></div>
         <div className="beta-section"><div style={{ color: 'var(--text-muted)', fontSize: '0.78rem' }}>Downstream Push</div><strong>{kraActionSummary.downstreamPush}</strong></div>
@@ -1229,6 +1310,11 @@ export default function Beta() {
         onLocalFilter={setReadinessFilter}
         onCopy={copyReadinessPans}
         onPush={pushRow}
+        onPushSelected={pushSelected}
+        selectedKeys={selectedKeys}
+        onToggleRow={toggleRow}
+        onToggleVisibleRows={toggleVisibleRows}
+        onClearSelection={clearSelectedRows}
         pushingKey={pushingKey}
       />
 

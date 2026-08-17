@@ -100,10 +100,18 @@ const getKraAction = (row) => {
   }
 
   if (hasOldKraValidated(row)) {
+    if (row.flow_type === 'DigiLocker') {
+      return {
+        status: 'KRA Push',
+        tone: '#2563eb',
+        detail: 'Old KRA validated before July 2026. DigiLocker flow needs fresh API KRA push.'
+      };
+    }
+
     return {
-      status: 'KRA valid',
-      tone: '#16a34a',
-      detail: 'Old KRA validated. No KRA push required.'
+      status: 'Push downstream',
+      tone: '#2563eb',
+      detail: 'KRA already valid before July 2026. Skip KRA push; push CDSL/NSE/BSE/TechExcel if pending.'
     };
   }
 
@@ -418,6 +426,7 @@ const targetDisabledReason = (target, row) => {
   if (target === 'cvlkra') {
     if (hasKraNameMismatch(row)) return nameMismatchReason;
     if (isBlockedPushPan(row.pan)) return 'Push blocked: KYC team completed KRA manually for this PAN';
+    if (hasOldKraValidated(row) && row.flow_type === 'DigiLocker') return '';
     if (hasKraValidated(row)) return 'KRA is already validated';
     if (hasKraXmlHold(row)) return 'Use Doc Push for XML hold rows';
     if (!isStatusPendingLike(row.cvlkra?.status)) return 'CVL KRA is not pending';
@@ -747,6 +756,7 @@ export default function Beta() {
       kraPush: 0,
       docPushOnly: 0,
       kraValid: 0,
+      downstreamPush: 0,
       doNotPush: 0,
       checkKra: 0
     };
@@ -755,6 +765,7 @@ export default function Beta() {
       const action = getKraAction(row).status;
       if (action === 'KRA Push') counts.kraPush += 1;
       else if (action === 'Doc Push only') counts.docPushOnly += 1;
+      else if (action === 'Push downstream') counts.downstreamPush += 1;
       else if (action === 'KRA valid') counts.kraValid += 1;
       else if (action === 'Do not push') counts.doNotPush += 1;
       else counts.checkKra += 1;
@@ -968,6 +979,7 @@ export default function Beta() {
         <div className="beta-section"><div style={{ color: 'var(--text-muted)', fontSize: '0.78rem' }}>Completed</div><strong>{summary.completed_count ?? summary.total ?? entries.length}</strong></div>
         <div className="beta-section"><div style={{ color: 'var(--text-muted)', fontSize: '0.78rem' }}>KRA Push</div><strong>{kraActionSummary.kraPush}</strong></div>
         <div className="beta-section"><div style={{ color: 'var(--text-muted)', fontSize: '0.78rem' }}>Doc Push Only</div><strong>{kraActionSummary.docPushOnly}</strong></div>
+        <div className="beta-section"><div style={{ color: 'var(--text-muted)', fontSize: '0.78rem' }}>Downstream Push</div><strong>{kraActionSummary.downstreamPush}</strong></div>
         <div className="beta-section"><div style={{ color: 'var(--text-muted)', fontSize: '0.78rem' }}>KRA Valid</div><strong>{kraActionSummary.kraValid}</strong></div>
         <div className="beta-section"><div style={{ color: 'var(--text-muted)', fontSize: '0.78rem' }}>Do Not Push</div><strong>{kraActionSummary.doNotPush}</strong></div>
       </div>

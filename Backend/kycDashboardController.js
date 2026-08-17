@@ -981,6 +981,12 @@ const getBetaEntries = async (req, res) => {
         ) AS cvlkra_error_code,
         cvl.cvlkra_acknowledgment_id,
         cvl.aadhaar_xml_s3_key,
+        cvl.app_occ,
+        cvl.app_income,
+        cvl.app_cor_add_proof,
+        cvl.app_per_add_proof,
+        cvl.app_doc_proof,
+        cvl.app_kyc_mode,
         CASE
           WHEN COALESCE(cvl.aadhaar_xml_s3_key, '') <> '' THEN 'Stored'
           WHEN COALESCE(digi.digilocker_raw_xml, '') <> '' THEN 'Raw XML in DB'
@@ -1044,7 +1050,16 @@ const getBetaEntries = async (req, res) => {
         error: [row.cvlkra_remarks, row.cvlkra_error].filter(Boolean).join(' | ') || null,
         errorCode: row.cvlkra_error_code,
         remarks: row.cvlkra_remarks,
-        acknowledgmentId: row.cvlkra_acknowledgment_id
+        acknowledgmentId: row.cvlkra_acknowledgment_id,
+        fields: {
+          appOcc: row.app_occ,
+          appIncome: row.app_income,
+          appCorAddProof: row.app_cor_add_proof,
+          appPerAddProof: row.app_per_add_proof,
+          appDocProof: row.app_doc_proof,
+          appKycMode: row.app_kyc_mode,
+          aadhaarXmlS3Key: row.aadhaar_xml_s3_key
+        }
       },
       cdsl: {
         id: row.cdsl_id,

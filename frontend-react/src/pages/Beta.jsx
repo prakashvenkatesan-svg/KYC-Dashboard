@@ -44,7 +44,11 @@ const hasKraXmlHold = (row) => {
 
 const hasValidXmlForApi = (row) => {
   const status = String(row?.xml_status || '').toLowerCase();
-  return status.includes('stored') || status.includes('raw xml');
+  return (
+    status.includes('stored') ||
+    status.includes('raw xml') ||
+    String(row?.cvlkra?.fields?.aadhaarXmlS3Key || '').trim() !== ''
+  );
 };
 
 const hasKraNotAvailable = (row) => {
@@ -80,6 +84,25 @@ const hasOldKraValidated = (row) => {
   if (!match) return false;
   const [, , month, year] = match.map(Number);
   return year < 2026 || (year === 2026 && month < 7);
+};
+
+const isBlankValue = (value) => value === null || value === undefined || String(value).trim() === '';
+
+const cvlkraFields = (row) => row?.cvlkra?.fields || {};
+
+const requiredKraFieldLabels = [
+  ['appOcc', 'occupation'],
+  ['appIncome', 'income'],
+  ['appCorAddProof', 'correspondence address proof'],
+  ['appPerAddProof', 'permanent address proof'],
+  ['appDocProof', 'document proof']
+];
+
+const missingCvlkraFields = (row) => {
+  const fields = cvlkraFields(row);
+  return requiredKraFieldLabels
+    .filter(([key]) => isBlankValue(fields[key]))
+    .map(([, label]) => label);
 };
 
 const getKraAction = (row) => {
@@ -153,6 +176,35 @@ const getKraAction = (row) => {
     status: 'Check KRA',
     tone: '#64748b',
     detail: 'Fetch latest KRA status before deciding.'
+  };
+};
+
+const getKraReadiness = (row) => {
+  const action = getKraAction(row);
+  const disabledReason = targetDisabledReason('cvlkra', row);
+  const missingFields = missingCvlkraFields(row);
+  const reasons = [];
+
+  if (isBlockedPushPan(row.pan)) reasons.push('KYC/manual blocklist');
+  if (hasKraNameMismatch(row)) reasons.push('Name mismatch with Income Tax');
+  if (row.flow_type === 'DigiLocker' && !hasValidXmlForApi(row)) reasons.push('Aadhaar XML missing/not stored');
+  if (missingFields.length) reasons.push(`Missing ${missingFields.join(', ')}`);
+  if (action.status !== 'KRA Push') reasons.push(action.detail);
+  if (disabledReason) reasons.push(disabledReason);
+
+  const uniqueReasons = [...new Set(reasons.filter(Boolean))];
+  const canPush = action.status === 'KRA Push'
+    && !disabledReason
+    && missingFields.length === 0
+    && (row.flow_type !== 'DigiLocker' || hasValidXmlForApi(row));
+
+  return {
+    canPush,
+    status: canPush ? 'Can push' : 'Cannot push',
+    tone: canPush ? '#16a34a' : '#ef4444',
+    action: action.status,
+    reason: canPush ? action.detail : (uniqueReasons.join(' | ') || 'Not eligible for KRA push'),
+    missingFields
   };
 };
 
@@ -683,6 +735,152 @@ function BetaTable({
   );
 }
 
+function KraReadinessPanel({
+  rowsByTab,
+  activeTab,
+  onTabChange,
+  localFilter,
+  onLocalFilter,
+  onCopy,
+  onPush,
+  pushingKey
+}) {
+  const activeRows = rowsByTab[activeTab] || [];
+  const filteredRows = useMemo(() => {
+    const query = String(localFilter || '').trim().toLowerCase();
+    if (!query) return activeRows;
+    return activeRows.filter(row => {
+      const readiness = row.kraReadiness || getKraReadiness(row);
+      return [
+        row.pan,
+        row.client_code,
+        row.application_id,
+        row.client_name,
+        row.flow_type,
+        readiness.action,
+        readiness.reason,
+        row.cvlkra?.status,
+        row.xml_status
+      ].some(value => String(value || '').toLowerCase().includes(query));
+    });
+  }, [activeRows, localFilter]);
+
+  const renderPushButton = (row) => {
+    const readiness = row.kraReadiness || getKraReadiness(row);
+    const key = `cvlkra:${row.application_id}:${row.pan || ''}`;
+    const loading = pushingKey === key;
+    const disabled = !readiness.canPush || Boolean(pushingKey);
+    return (
+      <button
+        className="beta-primary-btn"
+        disabled={disabled}
+        onClick={() => onPush('cvlkra', row)}
+        title={readiness.canPush ? 'Push this PAN to CVL KRA' : readiness.reason}
+        style={{
+          padding: '6px 10px',
+          fontSize: '0.76rem',
+          opacity: disabled ? 0.48 : 1,
+          background: disabled ? 'var(--subtle-surface)' : '#16a34a',
+          borderColor: disabled ? 'var(--surface-border)' : '#15803d',
+          color: disabled ? 'var(--text-muted)' : '#fff',
+          boxShadow: disabled ? 'none' : '0 2px 8px rgba(22, 163, 74, 0.28)'
+        }}
+      >
+        {loading ? loadingLabel('cvlkra') : 'Push KRA'}
+      </button>
+    );
+  };
+
+  const tabButton = (key, label) => (
+    <button
+      type="button"
+      className={activeTab === key ? 'beta-primary-btn' : 'beta-secondary-btn'}
+      onClick={() => onTabChange(key)}
+      style={{
+        background: activeTab === key ? 'var(--primary-color)' : 'var(--bg-color)',
+        borderColor: activeTab === key ? 'var(--primary-color)' : 'var(--border-color)',
+        color: activeTab === key ? '#fff' : 'var(--text-primary)'
+      }}
+    >
+      {label} ({rowsByTab[key]?.length || 0})
+    </button>
+  );
+
+  return (
+    <section className="beta-section" style={{ marginTop: 18 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'center', flexWrap: 'wrap', marginBottom: 12 }}>
+        <div>
+          <h2 style={{ margin: 0, fontSize: '1.05rem' }}>KRA Push Readiness</h2>
+          <p style={{ margin: '4px 0 0', color: 'var(--text-secondary)', fontSize: '0.86rem' }}>
+            Clear list of PANs that can be pushed now and PANs blocked by data, XML, KRA status, or manual hold.
+          </p>
+        </div>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          {tabButton('canPush', 'Can Push')}
+          {tabButton('cannotPush', 'Cannot Push')}
+          <button className="beta-secondary-btn" onClick={() => onCopy(activeTab)}>
+            Copy PANs
+          </button>
+        </div>
+      </div>
+
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', flexWrap: 'wrap', marginBottom: 12 }}>
+        <input
+          value={localFilter}
+          onChange={event => onLocalFilter(event.target.value)}
+          placeholder="Filter readiness list"
+          style={{ minWidth: 260, padding: '9px 10px', borderRadius: 6, border: '1px solid var(--border-color)', background: 'var(--bg-color)', color: 'var(--text-primary)' }}
+        />
+        <div style={{ color: 'var(--text-secondary)', fontSize: '0.86rem', fontWeight: 700 }}>
+          Showing {filteredRows.length} of {activeRows.length}
+        </div>
+      </div>
+
+      <div style={{ overflowX: 'auto', border: '1px solid var(--border-color)', borderRadius: 8 }}>
+        <table style={{ width: '100%', minWidth: 1340, borderCollapse: 'collapse', tableLayout: 'fixed' }}>
+          <thead>
+            <tr>
+              <th style={tableColumnStyles.pan}>PAN</th>
+              <th style={tableColumnStyles.clientCode}>CC</th>
+              <th style={tableColumnStyles.application}>Application</th>
+              <th style={tableColumnStyles.name}>Name</th>
+              <th style={tableColumnStyles.stage}>Flow</th>
+              <th style={{ width: 160 }}>Readiness</th>
+              <th style={{ width: 160 }}>KRA Action</th>
+              <th style={{ width: 360 }}>Reason</th>
+              <th style={tableColumnStyles.xml}>XML</th>
+              <th style={{ width: 130 }}>Push</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filteredRows.length === 0 ? (
+              <tr><td colSpan="10" style={{ textAlign: 'center', padding: 18 }}>No records found.</td></tr>
+            ) : filteredRows.map(row => {
+              const readiness = row.kraReadiness || getKraReadiness(row);
+              return (
+                <tr key={`readiness-${getRowKey(row)}`}>
+                  <td style={{ ...tableColumnStyles.pan, fontFamily: 'monospace', fontWeight: 700, verticalAlign: 'top' }}>{text(row.pan)}</td>
+                  <td style={{ ...tableColumnStyles.clientCode, fontFamily: 'monospace', verticalAlign: 'top' }}>{text(row.client_code)}</td>
+                  <td style={{ ...tableColumnStyles.application, verticalAlign: 'top' }}>{text(row.application_id)}</td>
+                  <td style={{ ...tableColumnStyles.name, verticalAlign: 'top', whiteSpace: 'normal', overflowWrap: 'anywhere' }}>{text(row.client_name)}</td>
+                  <td style={{ ...tableColumnStyles.stage, verticalAlign: 'top' }}>{text(row.flow_type)}</td>
+                  <td style={{ width: 160, verticalAlign: 'top' }}>{badge(readiness.status)}</td>
+                  <td style={{ width: 160, verticalAlign: 'top' }}>{badge(readiness.action)}</td>
+                  <td style={{ width: 360, verticalAlign: 'top', whiteSpace: 'normal', overflowWrap: 'anywhere', color: 'var(--text-muted)', fontSize: '0.78rem', lineHeight: 1.35 }}>
+                    {readiness.reason}
+                  </td>
+                  <td style={{ ...tableColumnStyles.xml, verticalAlign: 'top' }}>{badge(row.xml_status)}</td>
+                  <td style={{ width: 130, verticalAlign: 'top' }}>{renderPushButton(row)}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}
+
 export default function Beta() {
   const [filters, setFilters] = useState(blankFilters);
   const [entries, setEntries] = useState([]);
@@ -695,6 +893,8 @@ export default function Beta() {
   const [selectedKeys, setSelectedKeys] = useState(new Set());
   const [rowOverrides, setRowOverrides] = useState({});
   const [responseCopied, setResponseCopied] = useState(false);
+  const [readinessTab, setReadinessTab] = useState('canPush');
+  const [readinessFilter, setReadinessFilter] = useState('');
 
   const updateFilter = (key, value) => {
     setFilters(current => ({ ...current, [key]: value }));
@@ -773,6 +973,18 @@ export default function Beta() {
     }, initial);
   }, [displayEntries]);
 
+  const kraReadinessRows = useMemo(() => {
+    const rows = displayEntries.map(row => ({
+      ...row,
+      kraReadiness: getKraReadiness(row)
+    }));
+
+    return {
+      canPush: rows.filter(row => row.kraReadiness.canPush),
+      cannotPush: rows.filter(row => !row.kraReadiness.canPush)
+    };
+  }, [displayEntries]);
+
   const copyKraPans = async () => {
     const pans = grouped.kra.map(row => row.pan).filter(Boolean).join('\n');
     if (!pans) {
@@ -788,6 +1000,17 @@ export default function Beta() {
     await navigator.clipboard.writeText(message);
     setResponseCopied(true);
     window.setTimeout(() => setResponseCopied(false), 1600);
+  };
+
+  const copyReadinessPans = async (tab = readinessTab) => {
+    const rows = kraReadinessRows[tab] || [];
+    const pans = rows.map(row => row.pan).filter(Boolean).join('\n');
+    if (!pans) {
+      setMessage('No PANs available for this readiness list.');
+      return;
+    }
+    await navigator.clipboard.writeText(pans);
+    setMessage(`Copied ${rows.length} ${tab === 'canPush' ? 'pushable' : 'not-ready'} PAN(s).`);
   };
 
   const toggleRow = (key) => {
@@ -982,6 +1205,8 @@ export default function Beta() {
         <div className="beta-section"><div style={{ color: 'var(--text-muted)', fontSize: '0.78rem' }}>Downstream Push</div><strong>{kraActionSummary.downstreamPush}</strong></div>
         <div className="beta-section"><div style={{ color: 'var(--text-muted)', fontSize: '0.78rem' }}>KRA Valid</div><strong>{kraActionSummary.kraValid}</strong></div>
         <div className="beta-section"><div style={{ color: 'var(--text-muted)', fontSize: '0.78rem' }}>Do Not Push</div><strong>{kraActionSummary.doNotPush}</strong></div>
+        <div className="beta-section"><div style={{ color: 'var(--text-muted)', fontSize: '0.78rem' }}>Can Push Now</div><strong>{kraReadinessRows.canPush.length}</strong></div>
+        <div className="beta-section"><div style={{ color: 'var(--text-muted)', fontSize: '0.78rem' }}>Cannot Push</div><strong>{kraReadinessRows.cannotPush.length}</strong></div>
       </div>
 
       {message ? (
@@ -995,6 +1220,17 @@ export default function Beta() {
           <pre className="beta-alert">{message}</pre>
         </section>
       ) : null}
+
+      <KraReadinessPanel
+        rowsByTab={kraReadinessRows}
+        activeTab={readinessTab}
+        onTabChange={setReadinessTab}
+        localFilter={readinessFilter}
+        onLocalFilter={setReadinessFilter}
+        onCopy={copyReadinessPans}
+        onPush={pushRow}
+        pushingKey={pushingKey}
+      />
 
       <BetaTable
         title="KRA Flow"

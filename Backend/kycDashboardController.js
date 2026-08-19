@@ -860,6 +860,98 @@ const classifyBetaCvlkraStatus = (row, normalizeOptionalStatus) => {
   return normalizedStatus;
 };
 
+
+const parseBetaXmlAttribute = (tag, attr) => {
+  if (!tag) return null;
+  const pattern = new RegExp('\\b' + attr + '\\s*=\\s*["\']([^"\']*)["\']', 'i');
+  const match = String(tag).match(pattern);
+  return match ? match[1] : null;
+};
+
+const parseBetaXmlDate = (value) => {
+  if (!value) return null;
+  const parsed = new Date(String(value).trim());
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+};
+
+const getBetaXmlMetadata = ({ rawXml, s3Key, xmlStatus }) => {
+  const hasS3Key = String(s3Key || '').trim() !== '';
+  const raw = String(rawXml || '').trim();
+  const emptyResult = {
+    present: false,
+    source: null,
+    status: 'missing',
+    label: 'Missing',
+    rootName: null,
+    signatureCount: null,
+    generatedAt: null,
+    validUntil: null,
+    isCertificate: null,
+    isSigned: null,
+    isValidNow: null,
+    reason: 'Aadhaar XML is not available in DB/S3 key.'
+  };
+
+  if (!raw) {
+    if (hasS3Key) {
+      return {
+        ...emptyResult,
+        present: true,
+        source: 's3_key',
+        status: 'stored',
+        label: xmlStatus || 'Stored',
+        reason: 'S3 key present. Validity is not available because raw XML is not stored in DB.'
+      };
+    }
+    return emptyResult;
+  }
+
+  const xmlWithoutDecl = raw.replace(/^\s*<\?xml[^>]*\?>\s*/i, '');
+  const rootMatch = xmlWithoutDecl.match(/^<\s*([A-Za-z_][\w:.-]*)/);
+  const rootName = rootMatch ? rootMatch[1].split(':').pop() : null;
+  const signatureCount = (raw.match(/<\s*(?:[A-Za-z_][\w.-]*:)?Signature\b/g) || []).length;
+  const kycResTag = (raw.match(/<\s*(?:[A-Za-z_][\w.-]*:)?KycRes\b[^>]*>/i) || [null])[0];
+  const generatedAt = parseBetaXmlAttribute(kycResTag, 'ts');
+  const validUntil = parseBetaXmlAttribute(kycResTag, 'ttl');
+  const validUntilDate = parseBetaXmlDate(validUntil);
+  const isCertificate = rootName === 'Certificate';
+  const isSigned = signatureCount > 0;
+  let isValidNow = null;
+  if (validUntilDate) isValidNow = validUntilDate.getTime() >= Date.now();
+
+  let status = 'validity_unknown';
+  let label = 'XML present';
+  let reason = 'Signed Certificate XML is present; validity date was not found.';
+  if (!isCertificate || !isSigned) {
+    status = 'invalid';
+    label = 'Invalid XML';
+    reason = `${rootName || 'unknown'} XML with ${signatureCount} signature(s). CVLKRA API needs signed Certificate XML.`;
+  } else if (isValidNow === false) {
+    status = 'expired';
+    label = 'Expired XML';
+    reason = `XML validity expired on ${validUntil}.`;
+  } else if (isValidNow === true) {
+    status = 'valid';
+    label = 'Valid XML';
+    reason = 'Signed Certificate XML is present and within validity.';
+  }
+
+  return {
+    present: true,
+    source: hasS3Key ? 's3_key_and_db' : 'db_raw_xml',
+    status,
+    label,
+    rootName,
+    signatureCount,
+    generatedAt,
+    validUntil,
+    isCertificate,
+    isSigned,
+    isValidNow,
+    reason
+  };
+};
+
 const getBetaEntries = async (req, res) => {
   try {
     const {
@@ -1064,6 +1156,7 @@ const getBetaEntries = async (req, res) => {
         LEFT(COALESCE(cvl.api_response_payload::text, ''), 20000) AS cvlkra_response_text,
         cvl.cvlkra_acknowledgment_id,
         cvl.aadhaar_xml_s3_key,
+        digi.digilocker_raw_xml AS digilocker_raw_xml,
         cvl.app_occ,
         cvl.app_income,
         cvl.app_cor_add_proof,
@@ -1120,12 +1213,20 @@ const getBetaEntries = async (req, res) => {
 
     const normalizeOptionalStatus = (status) => status ? normalizeStatus(status) : null;
     const data = dataResult.rows.map(row => {
+      const { digilocker_raw_xml: digilockerRawXml, ...safeRow } = row;
+      const xmlMetadata = getBetaXmlMetadata({
+        rawXml: digilockerRawXml,
+        s3Key: row.aadhaar_xml_s3_key,
+        xmlStatus: row.xml_status
+      });
       const cvlkraStatus = classifyBetaCvlkraStatus(row, normalizeOptionalStatus);
       const recentModifyStatus = hasRecentModifyUnderProcessStatus(row) ? 'UNDER PROCESS - Modify KYC' : null;
       const recentModifyDate = extractRecentModifyStatusDate(row);
 
       return {
-      ...row,
+      ...safeRow,
+      xml_status: xmlMetadata.label,
+      xml: xmlMetadata,
       flow_type: mapBetaFlowType(row),
       cvlkra_status: cvlkraStatus,
       cdsl_push_status: normalizeOptionalStatus(row.cdsl_push_status),
@@ -1261,7 +1362,9 @@ const buildDefaultBetaPushPayload = ({ target, applicationId, pan }) => {
       mode: 'process',
       applicationIds: [applicationId],
       pans: pan ? [pan] : [],
-      limit: 1
+      limit: 1,
+      forceRepush: true,
+      allowNameMismatchUpdate: true
     };
   }
 
@@ -1269,7 +1372,8 @@ const buildDefaultBetaPushPayload = ({ target, applicationId, pan }) => {
     return {
       mode: 'documentUploadOnly',
       applicationId,
-      reconcileFinalStatus: true
+      reconcileFinalStatus: true,
+      allowNameMismatchUpdate: true
     };
   }
 
@@ -1443,9 +1547,14 @@ const pushBetaEntry = async (req, res) => {
       });
     }
 
-    const finalPayload = payload && typeof payload === 'object'
+    const requestedPayload = payload && typeof payload === 'object'
       ? payload
       : buildDefaultBetaPushPayload({ target: normalized, applicationId: appId, pan });
+    const finalPayload = normalized === 'cvlkra'
+      ? { ...requestedPayload, forceRepush: true, allowNameMismatchUpdate: true }
+      : normalized === 'cvlkra_document'
+        ? { ...requestedPayload, allowNameMismatchUpdate: true }
+        : requestedPayload;
 
     if (!url) {
       return res.status(501).json({

@@ -40,7 +40,10 @@ const cvlkraIssueText = (row) => [
   row?.cvlkra?.modificationStatusDate
 ].filter(Boolean).join(' ').toLowerCase();
 
-const hasKraNameMismatch = (row) => cvlkraIssueText(row).includes('name mismatch with income tax');
+const hasKraNameMismatch = (row) => {
+  const issueText = cvlkraIssueText(row);
+  return issueText.includes('name mismatch') || issueText.includes('name_mismatch');
+};
 
 const hasKraXmlHold = (row) => {
   const issueText = cvlkraIssueText(row);
@@ -50,7 +53,20 @@ const hasKraXmlHold = (row) => {
   );
 };
 
+const getXmlMetadata = (row) => row?.xml || null;
+
+const hasUsableXmlMetadata = (row) => {
+  const xml = getXmlMetadata(row);
+  if (!xml) return null;
+  if (!xml.present) return false;
+  if (xml.status === 'stored') return true;
+  if (xml.status === 'validity_unknown') return Boolean(xml.isCertificate && xml.isSigned);
+  return Boolean(xml.isCertificate && xml.isSigned && xml.isValidNow !== false);
+};
+
 const hasValidXmlForApi = (row) => {
+  const metadataUsable = hasUsableXmlMetadata(row);
+  if (metadataUsable !== null) return metadataUsable;
   const status = String(row?.xml_status || '').toLowerCase();
   return (
     status.includes('stored') ||
@@ -151,14 +167,6 @@ const getKraAction = (row) => {
     };
   }
 
-  if (hasKraNameMismatch(row)) {
-    return {
-      status: 'Do not push',
-      tone: '#ef4444',
-      detail: 'Name mismatch. Client consent/correction needed.'
-    };
-  }
-
   if (isBlockedPushPan(row.pan)) {
     return {
       status: 'Do not push',
@@ -172,6 +180,14 @@ const getKraAction = (row) => {
       status: 'Do not push',
       tone: '#ef4444',
       detail: 'Modify KYC is already under process after July 2026.'
+    };
+  }
+
+  if (hasKraNameMismatch(row)) {
+    return {
+      status: 'Admin re-push',
+      tone: '#f97316',
+      detail: 'Name mismatch with Income Tax. Admin may re-push after verification.'
     };
   }
 
@@ -239,15 +255,15 @@ const getKraReadiness = (row) => {
   const reasons = [];
 
   if (isBlockedPushPan(row.pan)) reasons.push('KYC/manual blocklist');
-  if (hasKraNameMismatch(row)) reasons.push('Name mismatch with Income Tax');
+  if (hasKraNameMismatch(row)) reasons.push('Name mismatch override requires admin confirmation');
   if (hasRecentModifyUnderProcess(row)) reasons.push('Modify KYC under process after July 2026');
   if (row.flow_type === 'DigiLocker' && !hasValidXmlForApi(row)) reasons.push('Aadhaar XML missing/not stored');
   if (missingFields.length) reasons.push(`Missing ${missingFields.join(', ')}`);
-  if (action.status !== 'KRA Push') reasons.push(action.detail);
+  if (!['KRA Push', 'Admin re-push'].includes(action.status)) reasons.push(action.detail);
   if (disabledReason) reasons.push(disabledReason);
 
   const uniqueReasons = [...new Set(reasons.filter(Boolean))];
-  const canPush = action.status === 'KRA Push'
+  const canPush = ['KRA Push', 'Admin re-push'].includes(action.status)
     && !isInternalTestPan(row.pan)
     && !disabledReason
     && missingFields.length === 0
@@ -318,6 +334,9 @@ const statusTone = (status) => {
   if (['success', 'passed', 'documents_uploaded', 'uploaded', 's'].includes(value)) return '#22c55e';
   if (['name_mismatch', 'xml_hold', 'kra_xml_hold'].some(x => value.includes(x))) return '#f97316';
   if (['modify_under_process', 'kra_modify_under_process'].some(x => value.includes(x))) return '#f97316';
+  if (['valid xml'].some(x => value.includes(x))) return '#22c55e';
+  if (['invalid xml', 'expired xml', 'missing'].some(x => value.includes(x))) return '#ef4444';
+  if (['xml present', 'stored', 'raw xml'].some(x => value.includes(x))) return '#eab308';
   if (['pending', 'under process', 'documents uploaded'].some(x => value.includes(x))) return '#eab308';
   if (['failed', 'rejected', 'error', 'hold'].some(x => value.includes(x))) return '#ef4444';
   return '#94a3b8';
@@ -349,6 +368,53 @@ const text = (value) => {
   return String(value);
 };
 
+const formatXmlDate = (value) => {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return String(value);
+  return date.toLocaleString('en-IN', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+};
+
+const xmlCell = (row) => {
+  const xml = getXmlMetadata(row);
+  if (!xml) return badge(row.xml_status);
+
+  const hasSignatureCount = xml.signatureCount !== null && xml.signatureCount !== undefined;
+  const detail = [
+    xml.rootName ? `root: ${xml.rootName}` : '',
+    hasSignatureCount ? `signatures: ${xml.signatureCount}` : '',
+    xml.generatedAt ? `generated: ${formatXmlDate(xml.generatedAt)}` : '',
+    xml.validUntil ? `valid until: ${formatXmlDate(xml.validUntil)}` : '',
+    xml.reason || ''
+  ].filter(Boolean).join('\n');
+
+  return (
+    <div title={detail} style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-start', minWidth: 0 }}>
+      {badge(xml.label || row.xml_status)}
+      <div style={{ color: 'var(--text-muted)', fontSize: '0.72rem', lineHeight: 1.25, whiteSpace: 'normal', overflowWrap: 'anywhere' }}>
+        {xml.rootName ? text(xml.rootName) : text(xml.source)}
+        {hasSignatureCount ? ` | sig ${xml.signatureCount}` : ''}
+      </div>
+      {xml.generatedAt ? (
+        <div style={{ color: 'var(--text-muted)', fontSize: '0.72rem', lineHeight: 1.25 }}>
+          Gen {formatXmlDate(xml.generatedAt)}
+        </div>
+      ) : null}
+      {xml.validUntil ? (
+        <div style={{ color: 'var(--text-muted)', fontSize: '0.72rem', lineHeight: 1.25 }}>
+          Till {formatXmlDate(xml.validUntil)}
+        </div>
+      ) : null}
+    </div>
+  );
+};
+
 const tableColumnStyles = {
   select: { width: 48 },
   pan: { width: 112 },
@@ -358,7 +424,7 @@ const tableColumnStyles = {
   stage: { width: 110 },
   integration: { width: 260 },
   kraAction: { width: 220 },
-  xml: { width: 100 }
+  xml: { width: 190 }
 };
 
 const statusCell = (integration, actions = []) => {
@@ -537,13 +603,12 @@ const targetDisabledReason = (target, row) => {
   const cdslUploaded = isCdslUploaded(row);
   const directKraFlow = row.flow_type === 'KRA';
   const cvlkraStatus = String(row.cvlkra?.status || '').toLowerCase();
-  const nameMismatchReason = 'Name mismatch with Income Tax. Do not push without client consent.';
 
   if (target === 'cvlkra') {
     if (isInternalTestPan(row.pan)) return 'Push blocked: internal/test PAN';
-    if (hasKraNameMismatch(row)) return nameMismatchReason;
     if (isBlockedPushPan(row.pan)) return 'Push blocked: KYC team completed KRA manually for this PAN';
     if (hasRecentModifyUnderProcess(row)) return 'Push blocked: Modify KYC already under process after July 2026';
+    if (hasKraNameMismatch(row)) return '';
     if (hasOldKraValidated(row) && row.flow_type === 'DigiLocker') return '';
     if (hasKraValidated(row)) return 'KRA is already validated';
     if (hasKraXmlHold(row)) return 'Use Doc Push for XML hold rows';
@@ -553,10 +618,10 @@ const targetDisabledReason = (target, row) => {
 
   if (target === 'cvlkra_document') {
     if (isInternalTestPan(row.pan)) return 'Push blocked: internal/test PAN';
-    if (hasKraNameMismatch(row)) return nameMismatchReason;
     if (isBlockedPushPan(row.pan)) return 'Push blocked: KYC team completed KRA manually for this PAN';
     if (hasRecentModifyUnderProcess(row)) return 'Push blocked: Modify KYC already under process after July 2026';
     if (directKraFlow) return 'Not needed for direct KRA flow';
+    if (hasKraNameMismatch(row)) return '';
     if (hasKraValidated(row)) return 'KRA is already validated; document upload is not needed';
     if (hasKraXmlHold(row)) return '';
     if (!isStatusSuccess(row.cvlkra?.status) && cvlkraStatus !== 'documents_uploaded') return 'Fresh KRA must be accepted before document upload';
@@ -602,6 +667,18 @@ const batchTargetsForFlow = (flowType) => (
     ? ['cvlkra', 'cvlkra_status', 'cdsl', 'cdsl_status', 'nse', 'bse', 'techexcel']
     : ['cvlkra', 'cvlkra_document', 'cvlkra_status', 'cdsl', 'cdsl_status', 'nse', 'bse', 'techexcel']
 );
+
+const pushConfirmationText = (target, rows, label, skippedCount = 0) => {
+  const mismatchCount = rows.filter(hasKraNameMismatch).length;
+  const skipText = skippedCount
+    ? ` ${skippedCount} selected row(s) are not eligible and will be skipped.`
+    : '';
+  const mismatchWarning = ['cvlkra', 'cvlkra_document'].includes(target) && mismatchCount
+    ? `\n\nWarning: ${mismatchCount} row(s) have a name mismatch with Income Tax. This admin action will proceed despite that mismatch. Confirm the client details before continuing.`
+    : '';
+
+  return `Push ${label}?${skipText}${mismatchWarning}`;
+};
 
 function BetaTable({
   title,
@@ -742,7 +819,7 @@ function BetaTable({
       </div>
 
       <div style={{ overflowX: 'auto', border: '1px solid var(--border-color)', borderRadius: 8 }}>
-        <table style={{ width: '100%', minWidth: 2030, borderCollapse: 'collapse', tableLayout: 'fixed' }}>
+        <table style={{ width: '100%', minWidth: 2140, borderCollapse: 'collapse', tableLayout: 'fixed' }}>
           <thead>
             <tr>
               <th style={tableColumnStyles.select}>
@@ -797,7 +874,7 @@ function BetaTable({
                   <td style={{ ...tableColumnStyles.integration, verticalAlign: 'top' }}>{statusCell(row.nse, actions.nse)}</td>
                   <td style={{ ...tableColumnStyles.integration, verticalAlign: 'top' }}>{statusCell(row.bse, actions.bse)}</td>
                   <td style={{ ...tableColumnStyles.integration, verticalAlign: 'top' }}>{statusCell(row.techexcel, actions.techexcel)}</td>
-                  <td style={{ ...tableColumnStyles.xml, verticalAlign: 'top' }}>{badge(row.xml_status)}</td>
+                  <td style={{ ...tableColumnStyles.xml, verticalAlign: 'top' }}>{xmlCell(row)}</td>
                 </tr>
               );
             })}
@@ -949,7 +1026,7 @@ function KraReadinessPanel({
       </div>
 
       <div style={{ overflowX: 'auto', border: '1px solid var(--border-color)', borderRadius: 8 }}>
-        <table style={{ width: '100%', minWidth: 1400, borderCollapse: 'collapse', tableLayout: 'fixed' }}>
+        <table style={{ width: '100%', minWidth: 1490, borderCollapse: 'collapse', tableLayout: 'fixed' }}>
           <thead>
             <tr>
               <th style={tableColumnStyles.select}>
@@ -1000,7 +1077,7 @@ function KraReadinessPanel({
                   <td style={{ width: 360, verticalAlign: 'top', whiteSpace: 'normal', overflowWrap: 'anywhere', color: 'var(--text-muted)', fontSize: '0.78rem', lineHeight: 1.35 }}>
                     {readiness.reason}
                   </td>
-                  <td style={{ ...tableColumnStyles.xml, verticalAlign: 'top' }}>{badge(row.xml_status)}</td>
+                  <td style={{ ...tableColumnStyles.xml, verticalAlign: 'top' }}>{xmlCell(row)}</td>
                   <td style={{ width: 130, verticalAlign: 'top' }}>{renderPushButton(row)}</td>
                 </tr>
               );
@@ -1180,9 +1257,12 @@ export default function Beta() {
 
     if (target === 'cvlkra') {
       return {
+        mode: 'process',
         pans,
         applicationIds,
-        limit: rows.length
+        limit: rows.length,
+        forceRepush: true,
+        allowNameMismatchUpdate: true
       };
     }
 
@@ -1192,7 +1272,8 @@ export default function Beta() {
         applicationIds,
         pans,
         limit: rows.length,
-        reconcileFinalStatus: true
+        reconcileFinalStatus: true,
+        allowNameMismatchUpdate: true
       };
     }
 
@@ -1228,7 +1309,7 @@ export default function Beta() {
     if (!rows.length) return;
     const label = `${pushLabel(target)} for ${rows.length} selected row(s)`;
     const skipText = skippedCount ? ` ${skippedCount} selected row(s) are not eligible and will be skipped.` : '';
-    if (!window.confirm(`Push ${label}?${skipText}`)) return;
+    if (!window.confirm(pushConfirmationText(target, rows, label, skippedCount))) return;
 
     setPushingKey(`batch:${target}`);
     setResponseCopied(false);
@@ -1262,22 +1343,38 @@ export default function Beta() {
 
   const pushRow = async (target, row) => {
     const label = `${row.pan || row.application_id} via ${pushLabel(target)}`;
-    if (!window.confirm(`Push ${label}?`)) return;
+    if (!window.confirm(pushConfirmationText(target, [row], label))) return;
     const nextPushingKey = `${target}:${row.application_id}:${row.pan || ''}`;
     setPushingKey(nextPushingKey);
     setResponseCopied(false);
     setMessage(`Sending ${label}...`);
     try {
-      const payload = target === 'cdsl_status'
+      const payload = target === 'cvlkra'
         ? {
-          mode: 'uploadedStatus',
+          mode: 'process',
           applicationIds: [row.application_id],
           pans: row.pan ? [row.pan] : [],
           limit: 1,
-          minAgeMinutes: 0,
-          forceDownload: true
+          forceRepush: true,
+          allowNameMismatchUpdate: true
         }
-        : undefined;
+        : target === 'cvlkra_document'
+          ? {
+            mode: 'documentUploadOnly',
+            applicationId: row.application_id,
+            reconcileFinalStatus: true,
+            allowNameMismatchUpdate: true
+          }
+          : target === 'cdsl_status'
+            ? {
+              mode: 'uploadedStatus',
+              applicationIds: [row.application_id],
+              pans: row.pan ? [row.pan] : [],
+              limit: 1,
+              minAgeMinutes: 0,
+              forceDownload: true
+            }
+            : undefined;
       const response = await api.pushBetaEntry({
         target,
         applicationId: row.application_id,

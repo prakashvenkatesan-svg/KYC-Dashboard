@@ -336,11 +336,17 @@ const api = {
       window.location.href = '/login';
       return;
     }
+    const data = await parseApiResponse(res, 'Fetched beta entries.');
     if (res.status === 403) {
-      return { success: false, forbidden: true, message: 'Admin access required' };
+      return { success: false, forbidden: true, message: data?.message || 'Admin access required' };
     }
-    if (!res.ok) throw new Error('Failed to fetch beta entries');
-    return res.json();
+    if (!res.ok || data?.success === false) {
+      const message = [data?.message, data?.error].filter(Boolean).join(': ');
+      const error = new Error(message || 'Failed to fetch beta entries');
+      error.payload = data;
+      throw error;
+    }
+    return data;
   },
   pushBetaEntry: async (payload) => {
     const res = await fetch(`${API_BASE_URL}/beta/push`, {

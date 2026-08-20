@@ -16,6 +16,16 @@ const formatCurrentStage = (currentStep, kycStatus) => {
   return `${fStep} (${fStatus})`;
 };
 
+const getStoredUser = () => {
+  try {
+    return JSON.parse(localStorage.getItem('kyc_user') || '{}');
+  } catch (e) {
+    return {};
+  }
+};
+
+const isAdminUser = (user) => String(user?.role || '').toLowerCase().includes('admin');
+
 const EditIcon = ({ onClick }) => (
   <svg style={{ position: 'absolute', right: 12, top: 12, cursor: 'pointer' }} onClick={onClick} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#475569" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
@@ -187,6 +197,8 @@ export default function ClientDetail() {
   const [timestamps, setTimestamps] = useState({});
   const [documents, setDocuments] = useState([]);
   const [selectedDoc, setSelectedDoc] = useState(null);
+  const [pushLoading, setPushLoading] = useState(false);
+  const [pushResult, setPushResult] = useState(null);
   
   const [zoom, setZoom] = useState(1);
   const [rotation, setRotation] = useState(0);
@@ -341,6 +353,46 @@ export default function ClientDetail() {
   const clientPhone = data.application?.mobile_number || data.mobile_number || 'N/A';
   const clientCodeStr = data.application?.client_code || data.client_code || clientCode || 'N/A';
   const clientStageLabel = formatCurrentStage(data.application?.current_stage || data.current_stage, data.application?.kyc_status || data.kyc_status);
+  const applicationId = data.application?.application_id || data.application?.id || data.application_id || data.id || (/^\d+$/.test(String(clientCode || '')) ? clientCode : null);
+  const adminUser = getStoredUser();
+  const canPushToCompletion = isAdminUser(adminUser) && applicationId;
+
+  const handlePushToCompletion = async () => {
+    if (!applicationId) return;
+
+    const cleanPan = clientPan && clientPan !== 'N/A' ? String(clientPan).trim().toUpperCase() : '';
+    const confirmed = window.confirm(
+      `Run push-to-completion for application ${applicationId}${cleanPan ? ` / ${cleanPan}` : ''}?`
+    );
+    if (!confirmed) return;
+
+    const numericApplicationId = Number(applicationId);
+    const requestPayload = {
+      mode: 'process',
+      applicationIds: [numericApplicationId],
+      pans: cleanPan ? [cleanPan] : [],
+      limit: 1
+    };
+
+    setPushLoading(true);
+    setPushResult(null);
+    try {
+      const result = await api.pushBetaEntry({
+        target: 'orchestrator',
+        applicationId: numericApplicationId,
+        pan: cleanPan || undefined,
+        payload: requestPayload
+      });
+      setPushResult({ success: true, data: result });
+    } catch (err) {
+      setPushResult({
+        success: false,
+        data: err.payload || { message: err.message || 'Push request failed.' }
+      });
+    } finally {
+      setPushLoading(false);
+    }
+  };
 
   const stageDefs = [
     { key: 'mobile_verification', label: 'Mobile' },
@@ -397,6 +449,39 @@ export default function ClientDetail() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: '#f8fafc' }}>
       <header className="top-header" style={{ display: 'none' }}></header> {/* Hidden as per screenshot 1 */}
+
+      {canPushToCompletion && (
+        <section style={{ margin: '12px 12px 0', padding: '18px 20px', borderRadius: 10, border: '2px solid #16a34a', background: '#ecfdf5', boxShadow: '0 8px 24px rgba(22, 163, 74, 0.16)' }}>
+          <div style={{ display: 'flex', gap: 18, alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap' }}>
+            <div>
+              <div style={{ color: '#166534', fontSize: '0.75rem', fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 4 }}>Admin Action</div>
+              <h2 style={{ margin: '0 0 6px', color: '#052e16', fontSize: '1.45rem', lineHeight: 1.2 }}>Push to Completion</h2>
+              <p style={{ margin: 0, color: '#166534', fontWeight: 600 }}>
+                Runs the orchestrator sequence for this application.
+                <span style={{ marginLeft: 10 }}>Application ID: {applicationId}</span>
+                <span style={{ marginLeft: 10 }}>PAN: {clientPan}</span>
+                <span style={{ marginLeft: 10 }}>Client: {clientCodeStr}</span>
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={handlePushToCompletion}
+              disabled={pushLoading}
+              style={{ minWidth: 240, padding: '16px 22px', border: 'none', borderRadius: 8, background: pushLoading ? '#86efac' : '#16a34a', color: '#ffffff', fontSize: '1.05rem', fontWeight: 800, cursor: pushLoading ? 'wait' : 'pointer', boxShadow: '0 8px 16px rgba(22, 163, 74, 0.24)' }}
+            >
+              {pushLoading ? 'Pushing...' : 'Push to Completion'}
+            </button>
+          </div>
+          {pushResult && (
+            <div style={{ marginTop: 14, borderRadius: 8, border: `1px solid ${pushResult.success ? '#86efac' : '#fecaca'}`, background: pushResult.success ? '#f0fdf4' : '#fff1f2', color: pushResult.success ? '#14532d' : '#991b1b', padding: 12 }}>
+              <div style={{ fontWeight: 800, marginBottom: 8 }}>{pushResult.success ? 'Push request completed' : 'Push request failed'}</div>
+              <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word', maxHeight: 260, overflow: 'auto', fontSize: '0.78rem' }}>
+                {JSON.stringify(pushResult.data, null, 2)}
+              </pre>
+            </div>
+          )}
+        </section>
+      )}
 
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden', padding: '12px', gap: '12px' }}>
         

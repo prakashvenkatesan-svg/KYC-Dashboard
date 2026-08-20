@@ -197,8 +197,8 @@ export default function ClientDetail() {
   const [timestamps, setTimestamps] = useState({});
   const [documents, setDocuments] = useState([]);
   const [selectedDoc, setSelectedDoc] = useState(null);
-  const [pushLoading, setPushLoading] = useState(false);
-  const [pushResult, setPushResult] = useState(null);
+  const [adminActionLoading, setAdminActionLoading] = useState('');
+  const [adminActionResult, setAdminActionResult] = useState(null);
   
   const [zoom, setZoom] = useState(1);
   const [rotation, setRotation] = useState(0);
@@ -355,44 +355,103 @@ export default function ClientDetail() {
   const clientStageLabel = formatCurrentStage(data.application?.current_stage || data.current_stage, data.application?.kyc_status || data.kyc_status);
   const applicationId = data.application?.application_id || data.application?.id || data.application_id || data.id || (/^\d+$/.test(String(clientCode || '')) ? clientCode : null);
   const adminUser = getStoredUser();
-  const canPushToCompletion = isAdminUser(adminUser) && applicationId;
+  const canUseAdminJourneyActions = isAdminUser(adminUser) && applicationId;
 
-  const handlePushToCompletion = async () => {
+  const handleAdminJourneyAction = async (action) => {
     if (!applicationId) return;
 
     const cleanPan = clientPan && clientPan !== 'N/A' ? String(clientPan).trim().toUpperCase() : '';
-    const confirmed = window.confirm(
-      `Run push-to-completion for application ${applicationId}${cleanPan ? ` / ${cleanPan}` : ''}?`
-    );
+    const confirmed = window.confirm(action.confirmText(applicationId, cleanPan));
     if (!confirmed) return;
 
     const numericApplicationId = Number(applicationId);
-    const requestPayload = {
-      mode: 'process',
-      applicationIds: [numericApplicationId],
-      pans: cleanPan ? [cleanPan] : [],
-      limit: 1
-    };
 
-    setPushLoading(true);
-    setPushResult(null);
+    setAdminActionLoading(action.key);
+    setAdminActionResult(null);
     try {
-      const result = await api.pushBetaEntry({
-        target: 'orchestrator',
-        applicationId: numericApplicationId,
+      const result = await api.post(action.endpoint(numericApplicationId), {
+        application_id: numericApplicationId,
+        client_code: clientCodeStr !== 'N/A' ? clientCodeStr : undefined,
         pan: cleanPan || undefined,
-        payload: requestPayload
+        remarks: action.remarks,
+        user_name: adminUser?.username || adminUser?.email || 'Admin',
+        user_role: adminUser?.role || 'Admin'
       });
-      setPushResult({ success: true, data: result });
+      if (result?.success === false) {
+        const error = new Error(result?.message || `${action.label} failed.`);
+        error.payload = result;
+        throw error;
+      }
+      setAdminActionResult({ success: true, data: result });
+      setData(prev => {
+        if (!prev) return prev;
+        const updated = result?.data || {};
+        const nextStep = updated.current_step || action.nextState.current_step;
+        const nextKycStatus = updated.kyc_status || action.nextState.kyc_status;
+        const nextIsCompleted = typeof updated.is_completed === 'boolean' ? updated.is_completed : action.nextState.is_completed;
+        const nextEsignStatus = updated.esign_status || action.nextState.esign_status;
+        return {
+          ...prev,
+          application: {
+            ...(prev.application || {}),
+            current_step: nextStep,
+            current_stage: nextStep,
+            kyc_status: nextKycStatus,
+            is_completed: nextIsCompleted,
+            ...(nextEsignStatus ? { esign_status: nextEsignStatus } : {})
+          },
+          current_stage: nextStep,
+          kyc_status: nextKycStatus
+        };
+      });
     } catch (err) {
-      setPushResult({
+      setAdminActionResult({
         success: false,
-        data: err.payload || { message: err.message || 'Push request failed.' }
+        data: err.payload || { message: err.message || `${action.label} failed.` }
       });
     } finally {
-      setPushLoading(false);
+      setAdminActionLoading('');
     }
   };
+
+  const adminJourneyActions = [
+    {
+      key: 'reopen-digilocker',
+      label: 'Reopen at DigiLocker',
+      buttonLabel: 'Reopen DigiLocker',
+      loadingLabel: 'Reopening...',
+      endpoint: (appId) => `/kyc-applications/${appId}/reopen-digilocker`,
+      remarks: 'Reopened at DigiLocker from dashboard detail page',
+      nextState: { current_step: 'digilocker_details', kyc_status: 'in_progress', is_completed: false },
+      confirmText: (appId, pan) => `Reopen application ${appId}${pan ? ` / ${pan}` : ''} at DigiLocker? The client will need to act again.`,
+      background: '#f59e0b',
+      loadingBackground: '#fcd34d'
+    },
+    {
+      key: 'move-esign',
+      label: 'Move to eSign',
+      buttonLabel: 'Move to eSign',
+      loadingLabel: 'Moving...',
+      endpoint: (appId) => `/kyc-applications/${appId}/move-esign`,
+      remarks: 'Moved to eSign from dashboard detail page',
+      nextState: { current_step: 'esign', kyc_status: 'in_progress', is_completed: false, esign_status: 'pending' },
+      confirmText: (appId, pan) => `Move application ${appId}${pan ? ` / ${pan}` : ''} to eSign? eSign status will be set to pending.`,
+      background: '#2563eb',
+      loadingBackground: '#93c5fd'
+    },
+    {
+      key: 'mark-completed',
+      label: 'Mark Completed',
+      buttonLabel: 'Mark Completed',
+      loadingLabel: 'Marking...',
+      endpoint: (appId) => `/kyc-applications/${appId}/complete`,
+      remarks: 'Marked completed from dashboard detail page',
+      nextState: { current_step: 'completed', kyc_status: 'completed', is_completed: true },
+      confirmText: (appId, pan) => `Mark application ${appId}${pan ? ` / ${pan}` : ''} as completed? This will not run orchestrator or integrations.`,
+      background: '#16a34a',
+      loadingBackground: '#86efac'
+    }
+  ];
 
   const stageDefs = [
     { key: 'mobile_verification', label: 'Mobile' },
@@ -450,33 +509,41 @@ export default function ClientDetail() {
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: '#f8fafc' }}>
       <header className="top-header" style={{ display: 'none' }}></header> {/* Hidden as per screenshot 1 */}
 
-      {canPushToCompletion && (
+      {canUseAdminJourneyActions && (
         <section style={{ margin: '12px 12px 0', padding: '18px 20px', borderRadius: 10, border: '2px solid #16a34a', background: '#ecfdf5', boxShadow: '0 8px 24px rgba(22, 163, 74, 0.16)' }}>
           <div style={{ display: 'flex', gap: 18, alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap' }}>
             <div>
               <div style={{ color: '#166534', fontSize: '0.75rem', fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 4 }}>Admin Action</div>
-              <h2 style={{ margin: '0 0 6px', color: '#052e16', fontSize: '1.45rem', lineHeight: 1.2 }}>Push to Completion</h2>
+              <h2 style={{ margin: '0 0 6px', color: '#052e16', fontSize: '1.45rem', lineHeight: 1.2 }}>Journey Controls</h2>
               <p style={{ margin: 0, color: '#166534', fontWeight: 600 }}>
-                Runs the orchestrator sequence for this application.
+                Direct dashboard state changes only. No orchestrator or integrations are called.
                 <span style={{ marginLeft: 10 }}>Application ID: {applicationId}</span>
                 <span style={{ marginLeft: 10 }}>PAN: {clientPan}</span>
                 <span style={{ marginLeft: 10 }}>Client: {clientCodeStr}</span>
               </p>
             </div>
-            <button
-              type="button"
-              onClick={handlePushToCompletion}
-              disabled={pushLoading}
-              style={{ minWidth: 240, padding: '16px 22px', border: 'none', borderRadius: 8, background: pushLoading ? '#86efac' : '#16a34a', color: '#ffffff', fontSize: '1.05rem', fontWeight: 800, cursor: pushLoading ? 'wait' : 'pointer', boxShadow: '0 8px 16px rgba(22, 163, 74, 0.24)' }}
-            >
-              {pushLoading ? 'Pushing...' : 'Push to Completion'}
-            </button>
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+              {adminJourneyActions.map(action => {
+                const loading = adminActionLoading === action.key;
+                return (
+                  <button
+                    key={action.key}
+                    type="button"
+                    onClick={() => handleAdminJourneyAction(action)}
+                    disabled={Boolean(adminActionLoading)}
+                    style={{ minWidth: 180, padding: '16px 18px', border: 'none', borderRadius: 8, background: loading ? action.loadingBackground : action.background, color: '#ffffff', fontSize: '1rem', fontWeight: 800, cursor: adminActionLoading ? 'wait' : 'pointer', boxShadow: '0 8px 16px rgba(15, 23, 42, 0.16)' }}
+                  >
+                    {loading ? action.loadingLabel : action.buttonLabel}
+                  </button>
+                );
+              })}
+            </div>
           </div>
-          {pushResult && (
-            <div style={{ marginTop: 14, borderRadius: 8, border: `1px solid ${pushResult.success ? '#86efac' : '#fecaca'}`, background: pushResult.success ? '#f0fdf4' : '#fff1f2', color: pushResult.success ? '#14532d' : '#991b1b', padding: 12 }}>
-              <div style={{ fontWeight: 800, marginBottom: 8 }}>{pushResult.success ? 'Push request completed' : 'Push request failed'}</div>
+          {adminActionResult && (
+            <div style={{ marginTop: 14, borderRadius: 8, border: `1px solid ${adminActionResult.success ? '#86efac' : '#fecaca'}`, background: adminActionResult.success ? '#f0fdf4' : '#fff1f2', color: adminActionResult.success ? '#14532d' : '#991b1b', padding: 12 }}>
+              <div style={{ fontWeight: 800, marginBottom: 8 }}>{adminActionResult.success ? 'Admin action saved' : 'Admin action failed'}</div>
               <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word', maxHeight: 260, overflow: 'auto', fontSize: '0.78rem' }}>
-                {JSON.stringify(pushResult.data, null, 2)}
+                {JSON.stringify(adminActionResult.data, null, 2)}
               </pre>
             </div>
           )}

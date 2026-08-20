@@ -273,8 +273,173 @@ const skipPaymentAction = (req, res) => updateJourneyStep(req, res, 'payment_ski
 const stepBackAction = (req, res) => updateJourneyStep(req, res, 'step_back', 'previous');
 const changeStepAction = (req, res) => updateJourneyStep(req, res, 'change_client_step', 'next');
 
+async function setApplicationState(req, res, config) {
+  const identifier = getIdentifier(req);
+  const remarks = (req.body.remarks || req.body.reason || config.defaultRemarks || '').trim();
+
+  if (!identifier) {
+    return res.status(400).json({ success: false, message: "Application ID or client code is required" });
+  }
+
+  const context = await findApplicationContext(identifier);
+  if (!context) {
+    return res.status(404).json({ success: false, message: "Client not found" });
+  }
+
+  const client = await pool.connect();
+  let updatedApplication = null;
+
+  try {
+    await client.query('BEGIN');
+
+    const result = await client.query(
+      `UPDATE public.kyc_applications
+       SET current_step = $1,
+           kyc_status = $2,
+           is_completed = $3,
+           esign_status = COALESCE($4, esign_status),
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = $5
+       RETURNING
+         id AS application_id,
+         client_code,
+         current_step,
+         kyc_status,
+         is_completed,
+         esign_status,
+         updated_at`,
+      [
+        config.currentStep,
+        config.kycStatus,
+        config.isCompleted,
+        config.esignStatus || null,
+        context.application_id
+      ]
+    );
+
+    await client.query('COMMIT');
+    updatedApplication = result.rows[0] || null;
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error(`${config.actionType} failed:`, error);
+    return res.status(500).json({
+      success: false,
+      message: config.failureMessage,
+      error: error.message
+    });
+  } finally {
+    client.release();
+  }
+
+  await writeAuditLog(context, config.actionType, context.current_step, config.currentStep, remarks, req);
+
+  return res.status(200).json({
+    success: true,
+    message: config.successMessage,
+    application_id: context.application_id,
+    client_code: updatedApplication?.client_code || context.client_code,
+    previous_step: context.current_step,
+    new_step: config.currentStep,
+    kyc_status: config.kycStatus,
+    is_completed: config.isCompleted,
+    esign_status: updatedApplication?.esign_status,
+    action_type: config.actionType,
+    data: updatedApplication
+  });
+}
+
+const reopenAtDigilockerAction = (req, res) => setApplicationState(req, res, {
+  actionType: 'reopen_at_digilocker',
+  currentStep: 'digilocker_details',
+  kycStatus: 'in_progress',
+  isCompleted: false,
+  defaultRemarks: 'Reopened at DigiLocker from dashboard',
+  successMessage: 'Application reopened at DigiLocker successfully',
+  failureMessage: 'Reopen at DigiLocker failed'
+});
+
+const moveToEsignAction = (req, res) => setApplicationState(req, res, {
+  actionType: 'move_to_esign',
+  currentStep: 'esign',
+  kycStatus: 'in_progress',
+  isCompleted: false,
+  esignStatus: 'pending',
+  defaultRemarks: 'Moved to eSign from dashboard',
+  successMessage: 'Application moved to eSign successfully',
+  failureMessage: 'Move to eSign failed'
+});
+
+async function markCompletedAction(req, res) {
+  const identifier = getIdentifier(req);
+  const remarks = (req.body.remarks || req.body.reason || 'Marked completed from dashboard').trim();
+
+  if (!identifier) {
+    return res.status(400).json({ success: false, message: "Application ID or client code is required" });
+  }
+
+  const context = await findApplicationContext(identifier);
+  if (!context) {
+    return res.status(404).json({ success: false, message: "Client not found" });
+  }
+
+  const client = await pool.connect();
+  let updatedApplication = null;
+
+  try {
+    await client.query('BEGIN');
+
+    const result = await client.query(
+      `UPDATE public.kyc_applications
+       SET current_step = 'completed',
+           kyc_status = 'completed',
+           is_completed = true,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = $1
+       RETURNING
+         id AS application_id,
+         client_code,
+         current_step,
+         kyc_status,
+         is_completed,
+         updated_at`,
+      [context.application_id]
+    );
+
+    await client.query('COMMIT');
+    updatedApplication = result.rows[0] || null;
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error("Mark completed failed:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Mark completed failed",
+      error: error.message
+    });
+  } finally {
+    client.release();
+  }
+
+  await writeAuditLog(context, 'mark_completed', context.current_step, 'completed', remarks, req);
+
+  return res.status(200).json({
+    success: true,
+    message: "Application marked completed successfully",
+    application_id: context.application_id,
+    client_code: updatedApplication?.client_code || context.client_code,
+    previous_step: context.current_step,
+    new_step: 'completed',
+    kyc_status: 'completed',
+    is_completed: true,
+    action_type: 'mark_completed',
+    data: updatedApplication
+  });
+}
+
 module.exports = {
   skipPaymentAction,
   stepBackAction,
-  changeStepAction
+  changeStepAction,
+  reopenAtDigilockerAction,
+  moveToEsignAction,
+  markCompletedAction
 };

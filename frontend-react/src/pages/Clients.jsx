@@ -8,6 +8,7 @@ import 'jspdf-autotable';
 const ALL_COLUMNS = {
   application_date: { label: 'APPLICATION DATE', mandatory: true },
   client_code: { label: 'CLIENT CODE', mandatory: true },
+  application_id: { label: 'APPLICATION ID', mandatory: true },
   client_name: { label: 'CLIENT NAME', mandatory: true },
   pan_number: { label: 'PAN NUMBER', mandatory: false },
   email_id: { label: 'EMAIL ID', mandatory: false },
@@ -29,7 +30,7 @@ const ALL_COLUMNS = {
 };
 
 const DEFAULT_VISIBLE = [
-  'application_date', 'client_code', 'client_name', 'pan_number', 'email_id', 'mobile_number',
+  'application_date', 'client_code', 'application_id', 'client_name', 'pan_number', 'email_id', 'mobile_number',
   'current_stage', 'kyc_status', 'cvlkra', 'cdsl', 'nse', 'bse', 'techexcel', 'esign_pdf', 'action'
 ];
 const DEFAULT_ORDER = [...DEFAULT_VISIBLE];
@@ -458,6 +459,7 @@ export default function Clients() {
                   {activeCols.map(col => {
                     let content = client[col] || 'N/A';
                     if (col === 'client_code') content = <CopyField value={client[col]} label="Client Code" />;
+                    if (col === 'application_id') content = <CopyField value={client[col]} label="Application ID" />;
                     if (col === 'pan_number') content = <CopyField value={client[col]} label="PAN Number" />;
                     if (col === 'mobile_number') content = <CopyField value={client[col]} label="Mobile Number" />;
                     

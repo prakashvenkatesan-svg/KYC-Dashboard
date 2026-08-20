@@ -31,7 +31,10 @@ const {
 const {
   skipPaymentAction,
   stepBackAction,
-  changeStepAction
+  changeStepAction,
+  reopenAtDigilockerAction,
+  moveToEsignAction,
+  markCompletedAction
 } = require("./kycJourneyController");
 
 const router = express.Router();
@@ -75,8 +78,20 @@ router.post("/kyc-applications/:applicationId/step-back", verifyTokenMiddleware,
 router.put("/kyc-applications/:applicationId/step-back", verifyTokenMiddleware, requireAdminMiddleware, stepBackAction);
 router.post("/kyc-applications/:applicationId/stages", verifyTokenMiddleware, requireAdminMiddleware, changeStepAction);
 router.put("/kyc-applications/:applicationId/stages", verifyTokenMiddleware, requireAdminMiddleware, changeStepAction);
+router.post("/kyc-applications/:applicationId/reopen-digilocker", verifyTokenMiddleware, requireAdminMiddleware, reopenAtDigilockerAction);
+router.put("/kyc-applications/:applicationId/reopen-digilocker", verifyTokenMiddleware, requireAdminMiddleware, reopenAtDigilockerAction);
+router.post("/kyc-applications/:applicationId/move-esign", verifyTokenMiddleware, requireAdminMiddleware, moveToEsignAction);
+router.put("/kyc-applications/:applicationId/move-esign", verifyTokenMiddleware, requireAdminMiddleware, moveToEsignAction);
+router.post("/kyc-applications/:applicationId/complete", verifyTokenMiddleware, requireAdminMiddleware, markCompletedAction);
+router.put("/kyc-applications/:applicationId/complete", verifyTokenMiddleware, requireAdminMiddleware, markCompletedAction);
 router.post("/clients/:clientCode/stages", verifyTokenMiddleware, requireAdminMiddleware, changeStepAction);
 router.put("/clients/:clientCode/stages", verifyTokenMiddleware, requireAdminMiddleware, changeStepAction);
+router.post("/clients/:clientCode/reopen-digilocker", verifyTokenMiddleware, requireAdminMiddleware, reopenAtDigilockerAction);
+router.put("/clients/:clientCode/reopen-digilocker", verifyTokenMiddleware, requireAdminMiddleware, reopenAtDigilockerAction);
+router.post("/clients/:clientCode/move-esign", verifyTokenMiddleware, requireAdminMiddleware, moveToEsignAction);
+router.put("/clients/:clientCode/move-esign", verifyTokenMiddleware, requireAdminMiddleware, moveToEsignAction);
+router.post("/clients/:clientCode/complete", verifyTokenMiddleware, requireAdminMiddleware, markCompletedAction);
+router.put("/clients/:clientCode/complete", verifyTokenMiddleware, requireAdminMiddleware, markCompletedAction);
 
 
 module.exports = router;

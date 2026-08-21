@@ -400,6 +400,12 @@ export default function ClientDetail() {
             is_completed: nextIsCompleted,
             ...(nextEsignStatus ? { esign_status: nextEsignStatus } : {})
           },
+          stages: action.clearLivePhoto
+            ? {
+                ...(prev.stages || {}),
+                live_photo: null
+              }
+            : prev.stages,
           current_stage: nextStep,
           kyc_status: nextKycStatus
         };
@@ -426,6 +432,19 @@ export default function ClientDetail() {
       confirmText: (appId, pan) => `Reopen application ${appId}${pan ? ` / ${pan}` : ''} at DigiLocker? The client will need to act again.`,
       background: '#f59e0b',
       loadingBackground: '#fcd34d'
+    },
+    {
+      key: 'reopen-live-photo',
+      label: 'Reopen Live Photo',
+      buttonLabel: 'Reopen Live Photo',
+      loadingLabel: 'Reopening...',
+      endpoint: (appId) => `/kyc-applications/${appId}/reopen-live-photo`,
+      remarks: 'Reopened at live photo and removed existing photo from dashboard detail page',
+      nextState: { current_step: 'live_photo', kyc_status: 'in_progress', is_completed: false, esign_status: 'pending' },
+      confirmText: (appId, pan) => `Reopen application ${appId}${pan ? ` / ${pan}` : ''} at Live Photo? This removes the existing live photo and resets eSign to pending.`,
+      background: '#dc2626',
+      loadingBackground: '#fca5a5',
+      clearLivePhoto: true
     },
     {
       key: 'move-esign',

@@ -369,6 +369,92 @@ const moveToEsignAction = (req, res) => setApplicationState(req, res, {
   failureMessage: 'Move to eSign failed'
 });
 
+async function reopenLivePhotoAction(req, res) {
+  const identifier = getIdentifier(req);
+  const remarks = (req.body.remarks || req.body.reason || 'Reopened at live photo from dashboard').trim();
+
+  if (!identifier) {
+    return res.status(400).json({ success: false, message: "Application ID or client code is required" });
+  }
+
+  const context = await findApplicationContext(identifier);
+  if (!context) {
+    return res.status(404).json({ success: false, message: "Client not found" });
+  }
+
+  const client = await pool.connect();
+  let updatedApplication = null;
+  let deletedPhotos = [];
+
+  try {
+    await client.query('BEGIN');
+
+    const deleted = await client.query(
+      `DELETE FROM public.applicant_photo_uploads
+       WHERE application_id = $1
+       RETURNING id, application_id, file_name, file_path`,
+      [context.application_id]
+    );
+    deletedPhotos = deleted.rows;
+
+    const result = await client.query(
+      `UPDATE public.kyc_applications
+       SET current_step = 'live_photo',
+           kyc_status = 'in_progress',
+           is_completed = false,
+           esign_status = 'pending',
+           esign_request_id = NULL,
+           esign_signed_at = NULL,
+           esign_signed_pdf_path = NULL,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = $1
+       RETURNING
+         id AS application_id,
+         client_code,
+         current_step,
+         kyc_status,
+         is_completed,
+         esign_status,
+         esign_request_id,
+         esign_signed_at,
+         esign_signed_pdf_path,
+         updated_at`,
+      [context.application_id]
+    );
+
+    await client.query('COMMIT');
+    updatedApplication = result.rows[0] || null;
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error("Reopen live photo failed:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Reopen live photo failed",
+      error: error.message
+    });
+  } finally {
+    client.release();
+  }
+
+  await writeAuditLog(context, 'reopen_live_photo', context.current_step, 'live_photo', remarks, req);
+
+  return res.status(200).json({
+    success: true,
+    message: "Application reopened at live photo successfully",
+    application_id: context.application_id,
+    client_code: updatedApplication?.client_code || context.client_code,
+    previous_step: context.current_step,
+    new_step: 'live_photo',
+    kyc_status: 'in_progress',
+    is_completed: false,
+    esign_status: 'pending',
+    action_type: 'reopen_live_photo',
+    deleted_photo_count: deletedPhotos.length,
+    deleted_photos: deletedPhotos,
+    data: updatedApplication
+  });
+}
+
 async function markCompletedAction(req, res) {
   const identifier = getIdentifier(req);
   const remarks = (req.body.remarks || req.body.reason || 'Marked completed from dashboard').trim();
@@ -440,6 +526,7 @@ module.exports = {
   stepBackAction,
   changeStepAction,
   reopenAtDigilockerAction,
+  reopenLivePhotoAction,
   moveToEsignAction,
   markCompletedAction
 };

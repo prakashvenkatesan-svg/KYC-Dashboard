@@ -33,6 +33,7 @@ const {
   stepBackAction,
   changeStepAction,
   reopenAtDigilockerAction,
+  reopenLivePhotoAction,
   moveToEsignAction,
   markCompletedAction
 } = require("./kycJourneyController");
@@ -80,6 +81,8 @@ router.post("/kyc-applications/:applicationId/stages", verifyTokenMiddleware, re
 router.put("/kyc-applications/:applicationId/stages", verifyTokenMiddleware, requireAdminMiddleware, changeStepAction);
 router.post("/kyc-applications/:applicationId/reopen-digilocker", verifyTokenMiddleware, requireAdminMiddleware, reopenAtDigilockerAction);
 router.put("/kyc-applications/:applicationId/reopen-digilocker", verifyTokenMiddleware, requireAdminMiddleware, reopenAtDigilockerAction);
+router.post("/kyc-applications/:applicationId/reopen-live-photo", verifyTokenMiddleware, requireAdminMiddleware, reopenLivePhotoAction);
+router.put("/kyc-applications/:applicationId/reopen-live-photo", verifyTokenMiddleware, requireAdminMiddleware, reopenLivePhotoAction);
 router.post("/kyc-applications/:applicationId/move-esign", verifyTokenMiddleware, requireAdminMiddleware, moveToEsignAction);
 router.put("/kyc-applications/:applicationId/move-esign", verifyTokenMiddleware, requireAdminMiddleware, moveToEsignAction);
 router.post("/kyc-applications/:applicationId/complete", verifyTokenMiddleware, requireAdminMiddleware, markCompletedAction);
@@ -88,6 +91,8 @@ router.post("/clients/:clientCode/stages", verifyTokenMiddleware, requireAdminMi
 router.put("/clients/:clientCode/stages", verifyTokenMiddleware, requireAdminMiddleware, changeStepAction);
 router.post("/clients/:clientCode/reopen-digilocker", verifyTokenMiddleware, requireAdminMiddleware, reopenAtDigilockerAction);
 router.put("/clients/:clientCode/reopen-digilocker", verifyTokenMiddleware, requireAdminMiddleware, reopenAtDigilockerAction);
+router.post("/clients/:clientCode/reopen-live-photo", verifyTokenMiddleware, requireAdminMiddleware, reopenLivePhotoAction);
+router.put("/clients/:clientCode/reopen-live-photo", verifyTokenMiddleware, requireAdminMiddleware, reopenLivePhotoAction);
 router.post("/clients/:clientCode/move-esign", verifyTokenMiddleware, requireAdminMiddleware, moveToEsignAction);
 router.put("/clients/:clientCode/move-esign", verifyTokenMiddleware, requireAdminMiddleware, moveToEsignAction);
 router.post("/clients/:clientCode/complete", verifyTokenMiddleware, requireAdminMiddleware, markCompletedAction);

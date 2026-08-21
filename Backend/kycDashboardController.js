@@ -1424,6 +1424,53 @@ const deleteBetaNominee = async (req, res) => {
   }
 };
 
+const resetBetaCdslPending = async (req, res) => {
+  try {
+    const applicationId = parseInt(req.params.applicationId, 10);
+    if (!applicationId) {
+      return res.status(400).json({ success: false, message: "Valid applicationId is required." });
+    }
+
+    const resetResult = await pool.query(`
+      UPDATE public.cdsl_data
+      SET
+        cdsl_push_status = 'PENDING',
+        cdsl_acknowledgment_id = NULL,
+        zip_file_name = NULL,
+        cdsl_msg_code = NULL,
+        cdsl_msg_desc = NULL,
+        rejection_reason = NULL,
+        updated_at = NOW()
+      WHERE application_id = $1
+      RETURNING
+        id,
+        application_id,
+        bo_id,
+        cdsl_push_status,
+        cdsl_acknowledgment_id,
+        zip_file_name,
+        cdsl_msg_code,
+        cdsl_msg_desc,
+        rejection_reason,
+        updated_at
+    `, [applicationId]);
+
+    if (!resetResult.rowCount) {
+      return res.status(404).json({ success: false, message: "CDSL row not found for this application." });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "CDSL reset to Pending. No integrations were called.",
+      application_id: applicationId,
+      data: resetResult.rows[0]
+    });
+  } catch (error) {
+    console.error("Reset beta CDSL pending error:", error);
+    return res.status(500).json({ success: false, message: "Server error while resetting CDSL to Pending", error: error.message });
+  }
+};
+
 const postJson = (urlString, payload) => {
   const http = require('http');
   const https = require('https');
@@ -1721,6 +1768,104 @@ const pushBetaEntry = async (req, res) => {
   }
 };
 
+const getRepopulateTablesTarget = () => ({
+  functionName:
+    process.env.TABLE_REPOPULATE_FUNCTION_NAME ||
+    process.env.EXPORT_JOBS_FUNCTION_NAME ||
+    process.env.BETA_EXPORT_JOBS_FUNCTION ||
+    process.env.BETA_ORCHESTRATOR_FUNCTION ||
+    process.env.ORCHESTRATOR_FUNCTION_NAME,
+  url:
+    process.env.TABLE_REPOPULATE_URL ||
+    process.env.EXPORT_JOBS_URL ||
+    process.env.BETA_EXPORT_JOBS_URL ||
+    process.env.BETA_ORCHESTRATOR_URL ||
+    process.env.ORCHESTRATOR_URL
+});
+
+const formatRepopulateTablesUrl = (url, applicationId, pan) => {
+  if (!url) return url;
+  return String(url)
+    .replace(/:applicationId\b/g, encodeURIComponent(String(applicationId)))
+    .replace(/\{applicationId\}/g, encodeURIComponent(String(applicationId)))
+    .replace(/:pan\b/g, encodeURIComponent(String(pan || '')))
+    .replace(/\{pan\}/g, encodeURIComponent(String(pan || '')));
+};
+
+const buildRepopulateTablesPayload = ({ applicationId, pan, clientCode, requestPayload }) => {
+  if (requestPayload && typeof requestPayload === 'object') {
+    return requestPayload;
+  }
+
+  const mode = process.env.TABLE_REPOPULATE_MODE || process.env.EXPORT_JOBS_MODE || 'process';
+  const payload = {
+    mode,
+    application_id: applicationId,
+    applicationId,
+    applicationIds: [applicationId],
+    limit: 1,
+    force: true,
+    source: 'kyc-dashboard-client-detail'
+  };
+
+  if (pan) payload.pans = [pan];
+  if (clientCode && clientCode !== 'N/A') payload.client_code = clientCode;
+
+  return payload;
+};
+
+const repopulateApplicationTables = async (req, res) => {
+  try {
+    const appId = parseInt(req.params.applicationId || req.body?.application_id || req.body?.applicationId, 10);
+    if (!appId) {
+      return res.status(400).json({ success: false, message: "applicationId is required." });
+    }
+
+    const pan = normalizePan(req.body?.pan);
+    const clientCode = String(req.body?.client_code || req.body?.clientCode || '').trim();
+    const finalPayload = buildRepopulateTablesPayload({
+      applicationId: appId,
+      pan,
+      clientCode,
+      requestPayload: req.body?.payload
+    });
+
+    const { functionName, url } = getRepopulateTablesTarget();
+
+    if (functionName) {
+      const response = await invokeLambda(functionName, finalPayload);
+      return res.status(200).json({
+        success: !response.functionError && response.statusCode >= 200 && response.statusCode < 300,
+        target: "repopulate_tables",
+        transport: "lambda",
+        requestPayload: finalPayload,
+        response
+      });
+    }
+
+    if (url) {
+      const requestBody = String(process.env.TABLE_REPOPULATE_EMPTY_BODY || '').toLowerCase() === 'true' ? {} : finalPayload;
+      const response = await postJson(formatRepopulateTablesUrl(url, appId, pan), requestBody);
+      return res.status(200).json({
+        success: response.statusCode >= 200 && response.statusCode < 300,
+        target: "repopulate_tables",
+        transport: "http",
+        requestPayload: requestBody,
+        response
+      });
+    }
+
+    return res.status(501).json({
+      success: false,
+      message: "Re-populate tables target is not configured. Set TABLE_REPOPULATE_FUNCTION_NAME or EXPORT_JOBS_FUNCTION_NAME. As HTTP fallback, set TABLE_REPOPULATE_URL or EXPORT_JOBS_URL.",
+      requestPayload: finalPayload
+    });
+  } catch (error) {
+    console.error("Re-populate tables error:", error);
+    return res.status(500).json({ success: false, message: "Server error while re-populating tables", error: error.message });
+  }
+};
+
 module.exports = {
   getDashboardSummary,
   getClients,
@@ -1735,5 +1880,7 @@ module.exports = {
   getBetaEntries,
   getBetaNominees,
   deleteBetaNominee,
+  resetBetaCdslPending,
+  repopulateApplicationTables,
   pushBetaEntry
 };

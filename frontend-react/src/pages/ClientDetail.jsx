@@ -383,33 +383,35 @@ export default function ClientDetail() {
         throw error;
       }
       setAdminActionResult({ success: true, data: result });
-      setData(prev => {
-        if (!prev) return prev;
-        const updated = result?.data || {};
-        const nextStep = updated.current_step || action.nextState.current_step;
-        const nextKycStatus = updated.kyc_status || action.nextState.kyc_status;
-        const nextIsCompleted = typeof updated.is_completed === 'boolean' ? updated.is_completed : action.nextState.is_completed;
-        const nextEsignStatus = updated.esign_status || action.nextState.esign_status;
-        return {
-          ...prev,
-          application: {
-            ...(prev.application || {}),
-            current_step: nextStep,
+      if (action.nextState) {
+        setData(prev => {
+          if (!prev) return prev;
+          const updated = result?.data || {};
+          const nextStep = updated.current_step || action.nextState.current_step;
+          const nextKycStatus = updated.kyc_status || action.nextState.kyc_status;
+          const nextIsCompleted = typeof updated.is_completed === 'boolean' ? updated.is_completed : action.nextState.is_completed;
+          const nextEsignStatus = updated.esign_status || action.nextState.esign_status;
+          return {
+            ...prev,
+            application: {
+              ...(prev.application || {}),
+              current_step: nextStep,
+              current_stage: nextStep,
+              kyc_status: nextKycStatus,
+              is_completed: nextIsCompleted,
+              ...(nextEsignStatus ? { esign_status: nextEsignStatus } : {})
+            },
+            stages: action.clearLivePhoto
+              ? {
+                  ...(prev.stages || {}),
+                  live_photo: null
+                }
+              : prev.stages,
             current_stage: nextStep,
-            kyc_status: nextKycStatus,
-            is_completed: nextIsCompleted,
-            ...(nextEsignStatus ? { esign_status: nextEsignStatus } : {})
-          },
-          stages: action.clearLivePhoto
-            ? {
-                ...(prev.stages || {}),
-                live_photo: null
-              }
-            : prev.stages,
-          current_stage: nextStep,
-          kyc_status: nextKycStatus
-        };
-      });
+            kyc_status: nextKycStatus
+          };
+        });
+      }
     } catch (err) {
       setAdminActionResult({
         success: false,
@@ -469,6 +471,17 @@ export default function ClientDetail() {
       confirmText: (appId, pan) => `Mark application ${appId}${pan ? ` / ${pan}` : ''} as completed? This will not run orchestrator or integrations.`,
       background: '#16a34a',
       loadingBackground: '#86efac'
+    },
+    {
+      key: 'repopulate-tables',
+      label: 'Re-populate Tables',
+      buttonLabel: 'Re-populate Tables',
+      loadingLabel: 'Re-populating...',
+      endpoint: (appId) => `/kyc-applications/${appId}/repopulate-tables`,
+      remarks: 'Re-populated downstream tables from dashboard detail page',
+      confirmText: (appId, pan) => `Re-populate downstream integration tables for application ${appId}${pan ? ` / ${pan}` : ''}? This does not push to CDSL, NSE, BSE, TechExcel, or KRA.`,
+      background: '#7c3aed',
+      loadingBackground: '#c4b5fd'
     }
   ];
 
@@ -535,7 +548,7 @@ export default function ClientDetail() {
               <div style={{ color: '#166534', fontSize: '0.75rem', fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 4 }}>Admin Action</div>
               <h2 style={{ margin: '0 0 6px', color: '#052e16', fontSize: '1.45rem', lineHeight: 1.2 }}>Journey Controls</h2>
               <p style={{ margin: 0, color: '#166534', fontWeight: 600 }}>
-                Direct dashboard state changes only. No orchestrator or integrations are called.
+                Journey buttons update dashboard state. Re-populate Tables refreshes downstream rows only; it does not push integrations.
                 <span style={{ marginLeft: 10 }}>Application ID: {applicationId}</span>
                 <span style={{ marginLeft: 10 }}>PAN: {clientPan}</span>
                 <span style={{ marginLeft: 10 }}>Client: {clientCodeStr}</span>

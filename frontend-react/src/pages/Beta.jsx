@@ -475,7 +475,8 @@ const statusCell = (integration, actions = []) => {
                 background: action.disabled ? 'var(--subtle-surface)' : (action.primary ? 'var(--primary-color)' : '#2563eb'),
                 borderColor: action.disabled ? 'var(--surface-border)' : (action.primary ? 'var(--primary-color)' : '#1d4ed8'),
                 color: action.disabled ? 'var(--text-muted)' : '#fff',
-                boxShadow: action.disabled ? 'none' : '0 2px 8px rgba(37, 99, 235, 0.28)'
+                boxShadow: action.disabled ? 'none' : '0 2px 8px rgba(37, 99, 235, 0.28)',
+                ...(action.style || {})
               }}
             >
               {action.loading ? (action.loadingLabel || 'Loading...') : action.label}
@@ -500,6 +501,11 @@ const isCdslUploaded = (row) => {
   if (status === 'uploaded') return true;
   if (isStatusSuccess(status) || isStatusFailed(status)) return false;
   return Boolean(row?.cdsl?.ackId && row?.cdsl?.zipFileName);
+};
+
+const canResetCdslPending = (row) => {
+  const status = String(row?.cdsl?.status || '').toLowerCase();
+  return Boolean(row?.application_id && row?.cdsl?.id && status && status !== 'pending');
 };
 
 const isStatusPendingLike = (status) => {
@@ -874,7 +880,8 @@ function BetaTable({
   onToggleRow,
   onToggleVisibleRows,
   onClearSelection,
-  onOpenNominees
+  onOpenNominees,
+  onResetCdslPending
 }) {
   const filteredRows = useMemo(
     () => rows.filter(row => includesText(row, localFilter)),
@@ -905,10 +912,36 @@ function BetaTable({
     };
   };
 
+  const makeCdslResetAction = (row) => {
+    const key = actionKey('cdsl_reset_pending', row);
+    const loading = pushingKey === key;
+    return {
+      key,
+      label: 'Reset Pending',
+      loadingLabel: 'Resetting...',
+      loading,
+      disabled: Boolean(pushingKey) || !canResetCdslPending(row),
+      title: 'Reset this CDSL row to Pending. This clears old CDSL ack/zip/response fields and does not call integrations.',
+      onClick: () => onResetCdslPending(row),
+      style: {
+        background: loading ? '#64748b' : '#475569',
+        borderColor: loading ? '#64748b' : '#334155',
+        boxShadow: loading ? 'none' : '0 2px 8px rgba(71, 85, 105, 0.22)'
+      }
+    };
+  };
+
   const rowActions = (row) => {
     const cdslSuccess = isStatusSuccess(row.cdsl?.status);
     const cdslUploaded = isCdslUploaded(row);
     const directKraFlow = row.flow_type === 'KRA';
+    const cdslActions = cdslUploaded
+      ? [makeAction('cdsl_status', row, 'Check CDSL', 'Download and apply the final CDSL response')]
+      : [makeAction('cdsl', row, 'Push CDSL', 'Push this record to CDSL')];
+
+    if (canResetCdslPending(row)) {
+      cdslActions.push(makeCdslResetAction(row));
+    }
 
     return {
       cvlkra: directKraFlow
@@ -921,11 +954,7 @@ function BetaTable({
           makeAction('cvlkra_document', row, 'Upload Docs', 'Upload KRA PDF/XML documents'),
           makeAction('cvlkra_status', row, 'Check KRA', 'Fetch final CVL KRA status and update the DB')
         ],
-      cdsl: cdslUploaded
-        ? [makeAction('cdsl_status', row, 'Check CDSL', 'Download and apply the final CDSL response')]
-        : [
-          makeAction('cdsl', row, 'Push CDSL', 'Push this record to CDSL')
-        ],
+      cdsl: cdslActions,
       nse: [makeAction('nse', row, 'Push NSE', cdslSuccess ? 'Push this record to NSE' : 'CDSL must be success before NSE')],
       bse: [makeAction('bse', row, 'Push BSE', cdslSuccess ? 'Push this record to BSE' : 'CDSL must be success before BSE')],
       techexcel: [makeAction('techexcel', row, 'Push TechExcel', cdslSuccess ? 'Push this record to TechExcel' : 'CDSL must be success before TechExcel')]
@@ -1668,6 +1697,31 @@ export default function Beta() {
     }
   };
 
+  const resetCdslPending = async (row) => {
+    if (!row?.application_id) return;
+    const label = `${row.pan || row.application_id}`;
+    if (!window.confirm(`Reset CDSL to Pending for ${label}? This clears the old CDSL ack/zip/response fields and does not call any integration.`)) return;
+
+    const nextPushingKey = `cdsl_reset_pending:${row.application_id}:${row.pan || ''}`;
+    setPushingKey(nextPushingKey);
+    setResponseCopied(false);
+    setMessage(`Resetting CDSL to Pending for ${label}...`);
+    try {
+      const response = await api.post(`/beta/applications/${row.application_id}/cdsl/reset-pending`, {});
+      setRowOverrides(current => {
+        const next = { ...current };
+        delete next[getRowKey(row)];
+        return next;
+      });
+      await loadEntries();
+      setMessage(JSON.stringify(response, null, 2));
+    } catch (error) {
+      setMessage(error.payload ? JSON.stringify(error.payload, null, 2) : (error.message || `Failed to reset CDSL for ${label}.`));
+    } finally {
+      setPushingKey('');
+    }
+  };
+
   return (
     <div className="table-container">
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16, flexWrap: 'wrap', marginBottom: 18 }}>
@@ -1754,6 +1808,7 @@ export default function Beta() {
         onClearSelection={clearSelectedRows}
         flowType="KRA"
         onOpenNominees={openNomineeModal}
+        onResetCdslPending={resetCdslPending}
       />
       <BetaTable
         title="DigiLocker Flow"
@@ -1770,6 +1825,7 @@ export default function Beta() {
         onClearSelection={clearSelectedRows}
         flowType="DigiLocker"
         onOpenNominees={openNomineeModal}
+        onResetCdslPending={resetCdslPending}
       />
 
       <NomineeModal

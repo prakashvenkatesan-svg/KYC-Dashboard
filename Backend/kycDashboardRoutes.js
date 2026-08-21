@@ -13,6 +13,8 @@ const {
   getBetaEntries,
   getBetaNominees,
   deleteBetaNominee,
+  resetBetaCdslPending,
+  repopulateApplicationTables,
   pushBetaEntry
 } = require("./kycDashboardController");
 
@@ -69,6 +71,7 @@ router.get("/payments", verifyTokenMiddleware, getPayments);
 router.get("/beta/entries", verifyTokenMiddleware, requireAdminMiddleware, getBetaEntries);
 router.get("/beta/applications/:applicationId/nominees", verifyTokenMiddleware, requireAdminMiddleware, getBetaNominees);
 router.delete("/beta/applications/:applicationId/nominees/:nomineeId", verifyTokenMiddleware, requireAdminMiddleware, deleteBetaNominee);
+router.post("/beta/applications/:applicationId/cdsl/reset-pending", verifyTokenMiddleware, requireAdminMiddleware, resetBetaCdslPending);
 router.post("/beta/push", verifyTokenMiddleware, requireAdminMiddleware, pushBetaEntry);
 
 router.put("/clients/:clientCode/edit-field", verifyTokenMiddleware, requireAdminMiddleware, editClientField);
@@ -91,6 +94,8 @@ router.post("/kyc-applications/:applicationId/move-esign", verifyTokenMiddleware
 router.put("/kyc-applications/:applicationId/move-esign", verifyTokenMiddleware, requireAdminMiddleware, moveToEsignAction);
 router.post("/kyc-applications/:applicationId/complete", verifyTokenMiddleware, requireAdminMiddleware, markCompletedAction);
 router.put("/kyc-applications/:applicationId/complete", verifyTokenMiddleware, requireAdminMiddleware, markCompletedAction);
+router.post("/kyc-applications/:applicationId/repopulate-tables", verifyTokenMiddleware, requireAdminMiddleware, repopulateApplicationTables);
+router.put("/kyc-applications/:applicationId/repopulate-tables", verifyTokenMiddleware, requireAdminMiddleware, repopulateApplicationTables);
 router.post("/clients/:clientCode/stages", verifyTokenMiddleware, requireAdminMiddleware, changeStepAction);
 router.put("/clients/:clientCode/stages", verifyTokenMiddleware, requireAdminMiddleware, changeStepAction);
 router.post("/clients/:clientCode/reopen-digilocker", verifyTokenMiddleware, requireAdminMiddleware, reopenAtDigilockerAction);

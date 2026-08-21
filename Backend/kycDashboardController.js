@@ -1768,19 +1768,18 @@ const pushBetaEntry = async (req, res) => {
   }
 };
 
+const DEFAULT_REPOPULATE_TABLES_URL = "https://57yp657i65.execute-api.ap-south-1.amazonaws.com/staging/api/export/all/{applicationId}";
+
 const getRepopulateTablesTarget = () => ({
   functionName:
     process.env.TABLE_REPOPULATE_FUNCTION_NAME ||
     process.env.EXPORT_JOBS_FUNCTION_NAME ||
-    process.env.BETA_EXPORT_JOBS_FUNCTION ||
-    process.env.BETA_ORCHESTRATOR_FUNCTION ||
-    process.env.ORCHESTRATOR_FUNCTION_NAME,
+    process.env.BETA_EXPORT_JOBS_FUNCTION,
   url:
     process.env.TABLE_REPOPULATE_URL ||
     process.env.EXPORT_JOBS_URL ||
     process.env.BETA_EXPORT_JOBS_URL ||
-    process.env.BETA_ORCHESTRATOR_URL ||
-    process.env.ORCHESTRATOR_URL
+    DEFAULT_REPOPULATE_TABLES_URL
 });
 
 const formatRepopulateTablesUrl = (url, applicationId, pan) => {

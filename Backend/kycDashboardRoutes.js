@@ -11,6 +11,8 @@ const {
   editClientField,
   getSystemAuditLogs,
   getBetaEntries,
+  getBetaNominees,
+  deleteBetaNominee,
   pushBetaEntry
 } = require("./kycDashboardController");
 
@@ -65,6 +67,8 @@ router.get("/kyc-applications/:applicationId/stages", verifyTokenMiddleware, get
 router.get("/integrations/:integrationName", verifyTokenMiddleware, getIntegrationRecords);
 router.get("/payments", verifyTokenMiddleware, getPayments);
 router.get("/beta/entries", verifyTokenMiddleware, requireAdminMiddleware, getBetaEntries);
+router.get("/beta/applications/:applicationId/nominees", verifyTokenMiddleware, requireAdminMiddleware, getBetaNominees);
+router.delete("/beta/applications/:applicationId/nominees/:nomineeId", verifyTokenMiddleware, requireAdminMiddleware, deleteBetaNominee);
 router.post("/beta/push", verifyTokenMiddleware, requireAdminMiddleware, pushBetaEntry);
 
 router.put("/clients/:clientCode/edit-field", verifyTokenMiddleware, requireAdminMiddleware, editClientField);

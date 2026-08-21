@@ -680,6 +680,186 @@ const pushConfirmationText = (target, rows, label, skippedCount = 0) => {
   return `Push ${label}?${skipText}${mismatchWarning}`;
 };
 
+const nomineeIssuePattern = /(nominee|nomination|sum of percentage|percentage of shares|allocation percentage|minor flag|relationship with bo|exact relationship)/i;
+
+const nomineeIssueText = (row) => [
+  row?.kraReadiness?.reason,
+  row?.cdsl?.error,
+  row?.nse?.error,
+  row?.bse?.error,
+  row?.techexcel?.error,
+  row?.cvlkra?.error,
+  row?.cvlkra?.remarks
+].filter(Boolean).join(' ');
+
+const hasNomineeIssue = (row) => nomineeIssuePattern.test(nomineeIssueText(row));
+
+const NomineeIssueButton = ({ row, onOpenNominees }) => {
+  if (!hasNomineeIssue(row) || !row?.application_id || !onOpenNominees) return null;
+
+  return (
+    <button
+      type="button"
+      className="beta-secondary-btn"
+      onClick={() => onOpenNominees(row)}
+      title="Open nominee details for this application"
+      style={{
+        padding: '5px 8px',
+        fontSize: '0.72rem',
+        minHeight: 28,
+        background: '#7c3aed',
+        borderColor: '#6d28d9',
+        color: '#fff',
+        boxShadow: '0 2px 8px rgba(124, 58, 237, 0.24)'
+      }}
+    >
+      View Nominees
+    </button>
+  );
+};
+
+const formatNomineeDate = (value) => {
+  if (!value) return '-';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return String(value);
+  return date.toLocaleDateString('en-IN', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric'
+  });
+};
+
+function NomineeModal({ state, onClose, onDelete }) {
+  if (!state.open) return null;
+
+  const row = state.row || {};
+  const nominees = state.nominees || [];
+  const totalAllocation = state.summary?.total_allocation ?? nominees.reduce((sum, nominee) => {
+    const value = Number(nominee.allocation_percentage || 0);
+    return sum + (Number.isFinite(value) ? value : 0);
+  }, 0);
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label="Nominee details"
+      style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 4000,
+        background: 'rgba(15, 23, 42, 0.62)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 24
+      }}
+    >
+      <div
+        style={{
+          width: 'min(1180px, 96vw)',
+          maxHeight: '88vh',
+          overflow: 'hidden',
+          background: 'var(--card-bg, var(--surface-color, #fff))',
+          color: 'var(--text-primary)',
+          border: '1px solid var(--border-color)',
+          borderRadius: 8,
+          boxShadow: '0 24px 80px rgba(15, 23, 42, 0.35)'
+        }}
+      >
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            gap: 16,
+            alignItems: 'flex-start',
+            padding: '18px 20px',
+            borderBottom: '1px solid var(--border-color)'
+          }}
+        >
+          <div>
+            <h2 style={{ margin: 0, fontSize: '1.18rem' }}>Nominee Details</h2>
+            <div style={{ marginTop: 6, color: 'var(--text-secondary)', fontSize: '0.86rem', lineHeight: 1.35 }}>
+              Application {text(row.application_id)} · PAN {text(row.pan)} · CC {text(row.client_code)}
+            </div>
+            <div style={{ marginTop: 6, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              {badge(`${nominees.length} nominee${nominees.length === 1 ? '' : 's'}`)}
+              {badge(`Allocation ${totalAllocation}%`)}
+            </div>
+          </div>
+          <button className="beta-secondary-btn" type="button" onClick={onClose}>Close</button>
+        </div>
+
+        <div style={{ padding: 20, overflow: 'auto', maxHeight: 'calc(88vh - 112px)' }}>
+          {state.loading ? (
+            <div style={{ padding: 18 }}>Loading nominees...</div>
+          ) : state.error ? (
+            <pre className="beta-alert" style={{ whiteSpace: 'pre-wrap' }}>{state.error}</pre>
+          ) : nominees.length === 0 ? (
+            <div style={{ padding: 18 }}>No nominee rows found.</div>
+          ) : (
+            <table style={{ width: '100%', minWidth: 1060, borderCollapse: 'collapse', tableLayout: 'fixed' }}>
+              <thead>
+                <tr>
+                  <th style={{ width: 56 }}>ID</th>
+                  <th style={{ width: 160 }}>Name</th>
+                  <th style={{ width: 110 }}>Relation</th>
+                  <th style={{ width: 110 }}>DOB</th>
+                  <th style={{ width: 92 }}>Gender</th>
+                  <th style={{ width: 125 }}>Mobile</th>
+                  <th style={{ width: 190 }}>Email</th>
+                  <th style={{ width: 110 }}>Proof</th>
+                  <th style={{ width: 150 }}>PAN/Aadhaar</th>
+                  <th style={{ width: 92 }}>Alloc.</th>
+                  <th style={{ width: 280 }}>Address</th>
+                  <th style={{ width: 105 }}>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {nominees.map(nominee => (
+                  <tr key={nominee.id}>
+                    <td style={{ verticalAlign: 'top', fontFamily: 'monospace' }}>{text(nominee.id)}</td>
+                    <td style={{ verticalAlign: 'top', whiteSpace: 'normal', overflowWrap: 'anywhere' }}>{text(nominee.nominee_name)}</td>
+                    <td style={{ verticalAlign: 'top' }}>{text(nominee.relation)}</td>
+                    <td style={{ verticalAlign: 'top' }}>{formatNomineeDate(nominee.dob)}</td>
+                    <td style={{ verticalAlign: 'top' }}>{text(nominee.gender)}</td>
+                    <td style={{ verticalAlign: 'top', fontFamily: 'monospace' }}>{text(nominee.mobile)}</td>
+                    <td style={{ verticalAlign: 'top', whiteSpace: 'normal', overflowWrap: 'anywhere' }}>{text(nominee.email)}</td>
+                    <td style={{ verticalAlign: 'top' }}>{text(nominee.nominee_proof_type)}</td>
+                    <td style={{ verticalAlign: 'top', fontFamily: 'monospace', whiteSpace: 'normal', overflowWrap: 'anywhere' }}>
+                      {[nominee.pan, nominee.aadhaar].filter(Boolean).join(' / ') || '-'}
+                    </td>
+                    <td style={{ verticalAlign: 'top' }}>{text(nominee.allocation_percentage)}</td>
+                    <td style={{ verticalAlign: 'top', whiteSpace: 'normal', overflowWrap: 'anywhere' }}>{text(nominee.nominee_address)}</td>
+                    <td style={{ verticalAlign: 'top' }}>
+                      <button
+                        type="button"
+                        className="beta-secondary-btn"
+                        disabled={state.deletingId === nominee.id}
+                        onClick={() => onDelete(nominee)}
+                        style={{
+                          padding: '5px 8px',
+                          fontSize: '0.72rem',
+                          minHeight: 28,
+                          background: state.deletingId === nominee.id ? 'var(--subtle-surface)' : '#dc2626',
+                          borderColor: state.deletingId === nominee.id ? 'var(--surface-border)' : '#b91c1c',
+                          color: state.deletingId === nominee.id ? 'var(--text-muted)' : '#fff'
+                        }}
+                      >
+                        {state.deletingId === nominee.id ? 'Deleting...' : 'Delete'}
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function BetaTable({
   title,
   description,
@@ -693,7 +873,8 @@ function BetaTable({
   selectedKeys,
   onToggleRow,
   onToggleVisibleRows,
-  onClearSelection
+  onClearSelection,
+  onOpenNominees
 }) {
   const filteredRows = useMemo(
     () => rows.filter(row => includesText(row, localFilter)),
@@ -819,7 +1000,7 @@ function BetaTable({
       </div>
 
       <div style={{ overflowX: 'auto', border: '1px solid var(--border-color)', borderRadius: 8 }}>
-        <table style={{ width: '100%', minWidth: 2140, borderCollapse: 'collapse', tableLayout: 'fixed' }}>
+        <table style={{ width: '100%', minWidth: 2260, borderCollapse: 'collapse', tableLayout: 'fixed' }}>
           <thead>
             <tr>
               <th style={tableColumnStyles.select}>
@@ -837,6 +1018,7 @@ function BetaTable({
               <th style={tableColumnStyles.name}>Name</th>
               <th style={tableColumnStyles.stage}>Stage</th>
               <th style={tableColumnStyles.kraAction}>KRA Action</th>
+              <th style={{ width: 130 }}>Nominees</th>
               <th style={tableColumnStyles.integration}>CVL KRA</th>
               <th style={tableColumnStyles.integration}>CDSL</th>
               <th style={tableColumnStyles.integration}>NSE</th>
@@ -847,7 +1029,7 @@ function BetaTable({
           </thead>
           <tbody>
             {filteredRows.length === 0 ? (
-              <tr><td colSpan="13" style={{ textAlign: 'center', padding: 18 }}>No records found.</td></tr>
+              <tr><td colSpan="14" style={{ textAlign: 'center', padding: 18 }}>No records found.</td></tr>
             ) : filteredRows.map(row => {
               const actions = rowActions(row);
               const key = getRowKey(row);
@@ -869,6 +1051,9 @@ function BetaTable({
                   <td style={{ ...tableColumnStyles.name, verticalAlign: 'top', whiteSpace: 'normal', overflowWrap: 'anywhere' }}>{text(row.client_name)}</td>
                   <td style={{ ...tableColumnStyles.stage, verticalAlign: 'top' }}>{text(row.current_step)}</td>
                   <td style={{ ...tableColumnStyles.kraAction, verticalAlign: 'top' }}>{actionBadge(kraAction)}</td>
+                  <td style={{ width: 130, verticalAlign: 'top' }}>
+                    <NomineeIssueButton row={row} onOpenNominees={onOpenNominees} />
+                  </td>
                   <td style={{ ...tableColumnStyles.integration, verticalAlign: 'top' }}>{statusCell(displayCvlkra(row), actions.cvlkra)}</td>
                   <td style={{ ...tableColumnStyles.integration, verticalAlign: 'top' }}>{statusCell(row.cdsl, actions.cdsl)}</td>
                   <td style={{ ...tableColumnStyles.integration, verticalAlign: 'top' }}>{statusCell(row.nse, actions.nse)}</td>
@@ -898,7 +1083,8 @@ function KraReadinessPanel({
   onToggleRow,
   onToggleVisibleRows,
   onClearSelection,
-  pushingKey
+  pushingKey,
+  onOpenNominees
 }) {
   const activeRows = rowsByTab[activeTab] || [];
   const filteredRows = useMemo(() => {
@@ -1026,7 +1212,7 @@ function KraReadinessPanel({
       </div>
 
       <div style={{ overflowX: 'auto', border: '1px solid var(--border-color)', borderRadius: 8 }}>
-        <table style={{ width: '100%', minWidth: 1490, borderCollapse: 'collapse', tableLayout: 'fixed' }}>
+        <table style={{ width: '100%', minWidth: 1620, borderCollapse: 'collapse', tableLayout: 'fixed' }}>
           <thead>
             <tr>
               <th style={tableColumnStyles.select}>
@@ -1046,13 +1232,14 @@ function KraReadinessPanel({
               <th style={{ width: 160 }}>Readiness</th>
               <th style={{ width: 160 }}>KRA Action</th>
               <th style={{ width: 360 }}>Reason</th>
+              <th style={{ width: 130 }}>Nominees</th>
               <th style={tableColumnStyles.xml}>XML</th>
               <th style={{ width: 130 }}>Push</th>
             </tr>
           </thead>
           <tbody>
             {filteredRows.length === 0 ? (
-              <tr><td colSpan="11" style={{ textAlign: 'center', padding: 18 }}>No records found.</td></tr>
+              <tr><td colSpan="12" style={{ textAlign: 'center', padding: 18 }}>No records found.</td></tr>
             ) : filteredRows.map(row => {
               const readiness = row.kraReadiness || getKraReadiness(row);
               const key = getRowKey(row);
@@ -1076,6 +1263,9 @@ function KraReadinessPanel({
                   <td style={{ width: 160, verticalAlign: 'top' }}>{badge(readiness.action)}</td>
                   <td style={{ width: 360, verticalAlign: 'top', whiteSpace: 'normal', overflowWrap: 'anywhere', color: 'var(--text-muted)', fontSize: '0.78rem', lineHeight: 1.35 }}>
                     {readiness.reason}
+                  </td>
+                  <td style={{ width: 130, verticalAlign: 'top' }}>
+                    <NomineeIssueButton row={row} onOpenNominees={onOpenNominees} />
                   </td>
                   <td style={{ ...tableColumnStyles.xml, verticalAlign: 'top' }}>{xmlCell(row)}</td>
                   <td style={{ width: 130, verticalAlign: 'top' }}>{renderPushButton(row)}</td>
@@ -1103,6 +1293,15 @@ export default function Beta() {
   const [responseCopied, setResponseCopied] = useState(false);
   const [readinessTab, setReadinessTab] = useState('canPush');
   const [readinessFilter, setReadinessFilter] = useState('');
+  const [nomineeModal, setNomineeModal] = useState({
+    open: false,
+    row: null,
+    nominees: [],
+    summary: null,
+    loading: false,
+    error: '',
+    deletingId: null
+  });
 
   const updateFilter = (key, value) => {
     setFilters(current => ({ ...current, [key]: value }));
@@ -1220,6 +1419,79 @@ export default function Beta() {
     }
     await navigator.clipboard.writeText(pans);
     setMessage(`Copied ${rows.length} ${tab === 'canPush' ? 'pushable' : 'not-ready'} PAN(s).`);
+  };
+
+  const openNomineeModal = async (row) => {
+    setNomineeModal({
+      open: true,
+      row,
+      nominees: [],
+      summary: null,
+      loading: true,
+      error: '',
+      deletingId: null
+    });
+    try {
+      const response = await api.get(`/beta/applications/${row.application_id}/nominees`);
+      if (response?.success === false) {
+        throw new Error(response.message || response.error || 'Failed to fetch nominee details.');
+      }
+      setNomineeModal(current => ({
+        ...current,
+        nominees: response?.data || [],
+        summary: response?.summary || null,
+        loading: false,
+        error: ''
+      }));
+    } catch (error) {
+      setNomineeModal(current => ({
+        ...current,
+        loading: false,
+        error: error.message || 'Failed to fetch nominee details.'
+      }));
+    }
+  };
+
+  const closeNomineeModal = () => {
+    setNomineeModal({
+      open: false,
+      row: null,
+      nominees: [],
+      summary: null,
+      loading: false,
+      error: '',
+      deletingId: null
+    });
+  };
+
+  const deleteNomineeFromModal = async (nominee) => {
+    const appId = nomineeModal.row?.application_id;
+    if (!appId || !nominee?.id) return;
+    const nomineeName = nominee.nominee_name || `ID ${nominee.id}`;
+    if (!window.confirm(`Delete nominee ${nomineeName} from application ${appId}? Integration statuses will not be changed.`)) return;
+
+    setNomineeModal(current => ({ ...current, deletingId: nominee.id, error: '' }));
+    try {
+      const response = await api.delete(`/beta/applications/${appId}/nominees/${nominee.id}`);
+      if (response?.success === false) {
+        throw new Error(response.message || response.error || 'Failed to delete nominee.');
+      }
+      setNomineeModal(current => ({
+        ...current,
+        nominees: response?.data || [],
+        summary: response?.summary || null,
+        deletingId: null,
+        error: ''
+      }));
+      setMessage(JSON.stringify(response, null, 2));
+      await loadEntries();
+    } catch (error) {
+      setNomineeModal(current => ({
+        ...current,
+        deletingId: null,
+        error: error.message || 'Failed to delete nominee.'
+      }));
+    }
   };
 
   const toggleRow = (key) => {
@@ -1464,6 +1736,7 @@ export default function Beta() {
         onToggleVisibleRows={toggleVisibleRows}
         onClearSelection={clearSelectedRows}
         pushingKey={pushingKey}
+        onOpenNominees={openNomineeModal}
       />
 
       <BetaTable
@@ -1480,6 +1753,7 @@ export default function Beta() {
         onToggleVisibleRows={toggleVisibleRows}
         onClearSelection={clearSelectedRows}
         flowType="KRA"
+        onOpenNominees={openNomineeModal}
       />
       <BetaTable
         title="DigiLocker Flow"
@@ -1495,6 +1769,13 @@ export default function Beta() {
         onToggleVisibleRows={toggleVisibleRows}
         onClearSelection={clearSelectedRows}
         flowType="DigiLocker"
+        onOpenNominees={openNomineeModal}
+      />
+
+      <NomineeModal
+        state={nomineeModal}
+        onClose={closeNomineeModal}
+        onDelete={deleteNomineeFromModal}
       />
     </div>
   );

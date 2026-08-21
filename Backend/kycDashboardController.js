@@ -1296,6 +1296,134 @@ const getBetaEntries = async (req, res) => {
   }
 };
 
+const getBetaNominees = async (req, res) => {
+  try {
+    const applicationId = parseInt(req.params.applicationId, 10);
+    if (!applicationId) {
+      return res.status(400).json({ success: false, message: "Valid applicationId is required." });
+    }
+
+    const [nomineeResult, summaryResult] = await Promise.all([
+      pool.query(`
+        SELECT
+          id,
+          application_id,
+          nominee_name,
+          dob,
+          mobile,
+          email,
+          relation,
+          gender,
+          nominee_proof_type,
+          aadhaar,
+          pan,
+          nominee_address,
+          same_address,
+          allocation_percentage,
+          created_at,
+          updated_at
+        FROM public.nominee_details
+        WHERE application_id = $1
+        ORDER BY created_at ASC NULLS LAST, id ASC
+      `, [applicationId]),
+      pool.query(`
+        SELECT
+          COUNT(*)::int AS nominee_count,
+          COALESCE(SUM(allocation_percentage), 0)::numeric AS total_allocation
+        FROM public.nominee_details
+        WHERE application_id = $1
+      `, [applicationId])
+    ]);
+
+    return res.status(200).json({
+      success: true,
+      application_id: applicationId,
+      data: nomineeResult.rows,
+      summary: {
+        nominee_count: summaryResult.rows[0]?.nominee_count || 0,
+        total_allocation: Number(summaryResult.rows[0]?.total_allocation || 0)
+      }
+    });
+  } catch (error) {
+    console.error("Get beta nominees error:", error);
+    return res.status(500).json({ success: false, message: "Server error while fetching nominees", error: error.message });
+  }
+};
+
+const deleteBetaNominee = async (req, res) => {
+  try {
+    const applicationId = parseInt(req.params.applicationId, 10);
+    const nomineeId = parseInt(req.params.nomineeId, 10);
+    if (!applicationId || !nomineeId) {
+      return res.status(400).json({ success: false, message: "Valid applicationId and nomineeId are required." });
+    }
+
+    const deleteResult = await pool.query(`
+      DELETE FROM public.nominee_details
+      WHERE id = $1
+        AND application_id = $2
+      RETURNING
+        id,
+        application_id,
+        nominee_name,
+        dob,
+        relation,
+        allocation_percentage
+    `, [nomineeId, applicationId]);
+
+    if (!deleteResult.rowCount) {
+      return res.status(404).json({ success: false, message: "Nominee row not found for this application." });
+    }
+
+    const [remainingResult, summaryResult] = await Promise.all([
+      pool.query(`
+        SELECT
+          id,
+          application_id,
+          nominee_name,
+          dob,
+          mobile,
+          email,
+          relation,
+          gender,
+          nominee_proof_type,
+          aadhaar,
+          pan,
+          nominee_address,
+          same_address,
+          allocation_percentage,
+          created_at,
+          updated_at
+        FROM public.nominee_details
+        WHERE application_id = $1
+        ORDER BY created_at ASC NULLS LAST, id ASC
+      `, [applicationId]),
+      pool.query(`
+        SELECT
+          COUNT(*)::int AS nominee_count,
+          COALESCE(SUM(allocation_percentage), 0)::numeric AS total_allocation
+        FROM public.nominee_details
+        WHERE application_id = $1
+      `, [applicationId])
+    ]);
+
+    return res.status(200).json({
+      success: true,
+      message: "Nominee deleted. Integration statuses were not changed.",
+      application_id: applicationId,
+      deleted: deleteResult.rows[0],
+      data: remainingResult.rows,
+      summary: {
+        nominee_count: summaryResult.rows[0]?.nominee_count || 0,
+        total_allocation: Number(summaryResult.rows[0]?.total_allocation || 0)
+      }
+    });
+  } catch (error) {
+    console.error("Delete beta nominee error:", error);
+    return res.status(500).json({ success: false, message: "Server error while deleting nominee", error: error.message });
+  }
+};
+
 const postJson = (urlString, payload) => {
   const http = require('http');
   const https = require('https');
@@ -1605,5 +1733,7 @@ module.exports = {
   getStageTimestamps,
   getSystemAuditLogs,
   getBetaEntries,
+  getBetaNominees,
+  deleteBetaNominee,
   pushBetaEntry
 };

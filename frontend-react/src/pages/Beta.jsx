@@ -557,7 +557,8 @@ const pushLabel = (target) => ({
   cdsl_status: 'CDSL Check',
   nse: 'NSE Push',
   bse: 'BSE Push',
-  techexcel: 'TechExcel Push'
+  techexcel: 'TechExcel Push',
+  techexcel_force: 'Force Push'
 }[target] || target);
 
 const loadingLabel = (target) => ({
@@ -568,7 +569,8 @@ const loadingLabel = (target) => ({
   cdsl_status: 'Checking CDSL...',
   nse: 'Pushing NSE...',
   bse: 'Pushing BSE...',
-  techexcel: 'Pushing TechExcel...'
+  techexcel: 'Pushing TechExcel...',
+  techexcel_force: 'Force pushing TechExcel...'
 }[target] || 'Loading...');
 
 const includesText = (row, query) => {
@@ -659,6 +661,11 @@ const targetDisabledReason = (target, row) => {
     return '';
   }
 
+  if (target === 'techexcel_force') {
+    if (isStatusSuccess(row.techexcel?.status)) return 'TechExcel is already success';
+    return '';
+  }
+
   if (['nse', 'bse', 'techexcel'].includes(target)) {
     if (!cdslSuccess) return 'CDSL must be success first';
     if (!isStatusPendingLike(row[target]?.status)) return `${pushLabel(target)} is not pending`;
@@ -670,8 +677,8 @@ const targetDisabledReason = (target, row) => {
 
 const batchTargetsForFlow = (flowType) => (
   flowType === 'KRA'
-    ? ['cvlkra', 'cvlkra_status', 'cdsl', 'cdsl_status', 'nse', 'bse', 'techexcel']
-    : ['cvlkra', 'cvlkra_document', 'cvlkra_status', 'cdsl', 'cdsl_status', 'nse', 'bse', 'techexcel']
+    ? ['cvlkra', 'cvlkra_status', 'cdsl', 'cdsl_status', 'nse', 'bse', 'techexcel', 'techexcel_force']
+    : ['cvlkra', 'cvlkra_document', 'cvlkra_status', 'cdsl', 'cdsl_status', 'nse', 'bse', 'techexcel', 'techexcel_force']
 );
 
 const pushConfirmationText = (target, rows, label, skippedCount = 0) => {
@@ -897,7 +904,7 @@ function BetaTable({
 
   const actionKey = (target, row) => `${target}:${row.application_id}:${row.pan || ''}`;
 
-  const makeAction = (target, row, label, title = '') => {
+  const makeAction = (target, row, label, title = '', options = {}) => {
     const key = actionKey(target, row);
     const loading = pushingKey === key;
     const disabledReason = targetDisabledReason(target, row);
@@ -908,7 +915,8 @@ function BetaTable({
       loading,
       disabled: Boolean(disabledReason) || Boolean(pushingKey),
       title: disabledReason || title,
-      onClick: () => onPush(target, row)
+      onClick: () => onPush(target, row),
+      ...options
     };
   };
 
@@ -957,7 +965,16 @@ function BetaTable({
       cdsl: cdslActions,
       nse: [makeAction('nse', row, 'Push NSE', cdslSuccess ? 'Push this record to NSE' : 'CDSL must be success before NSE')],
       bse: [makeAction('bse', row, 'Push BSE', cdslSuccess ? 'Push this record to BSE' : 'CDSL must be success before BSE')],
-      techexcel: [makeAction('techexcel', row, 'Push TechExcel', cdslSuccess ? 'Push this record to TechExcel' : 'CDSL must be success before TechExcel')]
+      techexcel: [
+        makeAction('techexcel', row, 'Push TechExcel', cdslSuccess ? 'Push this record to TechExcel' : 'CDSL must be success before TechExcel'),
+        makeAction('techexcel_force', row, 'Force Push', 'Force push TechExcel without requiring CDSL success', {
+          style: {
+            background: '#dc2626',
+            borderColor: '#b91c1c',
+            boxShadow: '0 2px 8px rgba(220, 38, 38, 0.28)'
+          }
+        })
+      ]
     };
   };
 
@@ -1598,6 +1615,20 @@ export default function Beta() {
       };
     }
 
+    if (target === 'techexcel_force') {
+      return {
+        mode: 'process',
+        applicationIds,
+        pans,
+        limit: rows.length,
+        forcePush: true,
+        skipCdslCheck: true,
+        bypassCdslCheck: true,
+        allowCdslFailure: true,
+        source: 'kyc-dashboard-beta-force-push'
+      };
+    }
+
     return {
       mode: 'process',
       applicationIds,
@@ -1675,7 +1706,19 @@ export default function Beta() {
               minAgeMinutes: 0,
               forceDownload: true
             }
-            : undefined;
+            : target === 'techexcel_force'
+              ? {
+                mode: 'process',
+                applicationIds: [row.application_id],
+                pans: row.pan ? [row.pan] : [],
+                limit: 1,
+                forcePush: true,
+                skipCdslCheck: true,
+                bypassCdslCheck: true,
+                allowCdslFailure: true,
+                source: 'kyc-dashboard-beta-force-push'
+              }
+              : undefined;
       const response = await api.pushBetaEntry({
         target,
         applicationId: row.application_id,

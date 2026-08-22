@@ -1522,7 +1522,8 @@ const getBetaPushTarget = (target) => {
     cdsl_status: process.env.BETA_CDSL_URL || process.env.CDSL_KYC_URL,
     nse: process.env.BETA_NSE_URL || process.env.NSE_CONNECT_URL,
     bse: process.env.BETA_BSE_URL || process.env.BSE_CONNECT_URL,
-    techexcel: process.env.BETA_TECHEXCEL_URL || process.env.TECHEXCEL_CONNECT_URL
+    techexcel: process.env.BETA_TECHEXCEL_URL || process.env.TECHEXCEL_CONNECT_URL,
+    techexcel_force: process.env.BETA_TECHEXCEL_URL || process.env.TECHEXCEL_CONNECT_URL
   };
 
   return {
@@ -1587,6 +1588,15 @@ const buildDefaultBetaPushPayload = ({ target, applicationId, pan }) => {
     limit: 1
   };
 };
+
+const withTechExcelForceFlags = (payload) => ({
+  ...payload,
+  forcePush: true,
+  skipCdslCheck: true,
+  bypassCdslCheck: true,
+  allowCdslFailure: true,
+  source: payload?.source || 'kyc-dashboard-beta-force-push'
+});
 
 const parseJsonIfString = (value) => {
   if (typeof value !== 'string') return value;
@@ -1708,7 +1718,7 @@ const pushBetaEntry = async (req, res) => {
     }
 
     const { normalized, url } = getBetaPushTarget(target);
-    const allowedTargets = ['orchestrator', 'cvlkra', 'cvlkra_document', 'cvlkra_status', 'cdsl', 'cdsl_status', 'nse', 'bse', 'techexcel'];
+    const allowedTargets = ['orchestrator', 'cvlkra', 'cvlkra_document', 'cvlkra_status', 'cdsl', 'cdsl_status', 'nse', 'bse', 'techexcel', 'techexcel_force'];
     if (!allowedTargets.includes(normalized)) {
       return res.status(400).json({ success: false, message: "Unsupported push target." });
     }
@@ -1725,11 +1735,13 @@ const pushBetaEntry = async (req, res) => {
     const requestedPayload = payload && typeof payload === 'object'
       ? payload
       : buildDefaultBetaPushPayload({ target: normalized, applicationId: appId, pan });
-    const finalPayload = normalized === 'cvlkra'
-      ? { ...requestedPayload, forceRepush: true, allowNameMismatchUpdate: true }
-      : normalized === 'cvlkra_document'
-        ? { ...requestedPayload, allowNameMismatchUpdate: true }
-        : requestedPayload;
+    const finalPayload = normalized === 'techexcel_force'
+      ? withTechExcelForceFlags(requestedPayload)
+      : normalized === 'cvlkra'
+        ? { ...requestedPayload, forceRepush: true, allowNameMismatchUpdate: true }
+        : normalized === 'cvlkra_document'
+          ? { ...requestedPayload, allowNameMismatchUpdate: true }
+          : requestedPayload;
 
     if (!url) {
       return res.status(501).json({

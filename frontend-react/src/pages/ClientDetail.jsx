@@ -199,6 +199,8 @@ export default function ClientDetail() {
   const [selectedDoc, setSelectedDoc] = useState(null);
   const [adminActionLoading, setAdminActionLoading] = useState('');
   const [adminActionResult, setAdminActionResult] = useState(null);
+  const [nameEditorOpen, setNameEditorOpen] = useState(false);
+  const [applicantNameInput, setApplicantNameInput] = useState('');
   
   const [zoom, setZoom] = useState(1);
   const [rotation, setRotation] = useState(0);
@@ -422,6 +424,68 @@ export default function ClientDetail() {
     }
   };
 
+  const handleApplicantNameUpdate = async (event) => {
+    event.preventDefault();
+    if (!applicationId) return;
+
+    const cleanPan = clientPan && clientPan !== 'N/A' ? String(clientPan).trim().toUpperCase() : '';
+    const newName = String(applicantNameInput || '').replace(/\s+/g, ' ').trim().toUpperCase();
+    const currentName = String(clientName || '').replace(/\s+/g, ' ').trim().toUpperCase();
+    if (newName.length < 2) {
+      setAdminActionResult({ success: false, data: { message: 'Enter the complete corrected applicant name.' } });
+      return;
+    }
+    if (newName === currentName) {
+      setAdminActionResult({ success: false, data: { message: 'The new name is the same as the current name.' } });
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Change applicant name for application ${applicationId}${cleanPan ? ` / ${cleanPan}` : ''}?\n\n` +
+      `Current: ${currentName}\nNew: ${newName}\n\n` +
+      'This updates application-scoped database rows only. It does not change the signed PDF or records already submitted to external integrations.'
+    );
+    if (!confirmed) return;
+
+    const numericApplicationId = Number(applicationId);
+    setAdminActionLoading('update-applicant-name');
+    setAdminActionResult(null);
+    try {
+      const result = await api.post(`/kyc-applications/${numericApplicationId}/applicant-name`, {
+        new_name: newName,
+        expected_current_name: currentName,
+        expected_pan: cleanPan || undefined,
+        user_name: adminUser?.username || adminUser?.email || 'Admin'
+      });
+      if (result?.success === false) {
+        const updateError = new Error(result?.message || 'Applicant name update failed.');
+        updateError.payload = result;
+        throw updateError;
+      }
+
+      setAdminActionResult({ success: true, data: result });
+      setApplicantNameInput(newName);
+      setNameEditorOpen(false);
+
+      try {
+        const refreshed = await api.getClientById(numericApplicationId);
+        if (refreshed?.success && refreshed.data) {
+          setData(refreshed.data);
+          extractDocuments(refreshed.data.stages);
+        }
+      } catch (refreshError) {
+        console.warn('Applicant name saved, but client details could not be refreshed:', refreshError);
+      }
+    } catch (updateError) {
+      setAdminActionResult({
+        success: false,
+        data: updateError.payload || { message: updateError.message || 'Applicant name update failed.' }
+      });
+    } finally {
+      setAdminActionLoading('');
+    }
+  };
+
   const adminJourneyActions = [
     {
       key: 'reopen-digilocker',
@@ -569,8 +633,63 @@ export default function ClientDetail() {
                   </button>
                 );
               })}
+              <button
+                type="button"
+                onClick={() => {
+                  setApplicantNameInput(clientName === 'Unknown Client' ? '' : String(clientName).toUpperCase());
+                  setAdminActionResult(null);
+                  setNameEditorOpen(true);
+                }}
+                disabled={Boolean(adminActionLoading)}
+                style={{ minWidth: 180, padding: '16px 18px', border: 'none', borderRadius: 8, background: '#0f766e', color: '#ffffff', fontSize: '1rem', fontWeight: 800, cursor: adminActionLoading ? 'wait' : 'pointer', boxShadow: '0 8px 16px rgba(15, 23, 42, 0.16)' }}
+              >
+                Update Name
+              </button>
             </div>
           </div>
+          {nameEditorOpen && (
+            <form onSubmit={handleApplicantNameUpdate} style={{ marginTop: 14, padding: 14, border: '1px solid #99f6e4', borderRadius: 8, background: '#f0fdfa' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 260px), 1fr))', gap: 12, alignItems: 'end' }}>
+                <div>
+                  <div style={{ color: '#475569', fontSize: '0.75rem', fontWeight: 700, marginBottom: 6 }}>Current applicant name</div>
+                  <div style={{ minHeight: 42, display: 'flex', alignItems: 'center', padding: '9px 11px', border: '1px solid #cbd5e1', borderRadius: 6, background: '#ffffff', color: '#0f172a', fontWeight: 700 }}>{clientName}</div>
+                </div>
+                <label style={{ display: 'block' }}>
+                  <span style={{ display: 'block', color: '#134e4a', fontSize: '0.75rem', fontWeight: 800, marginBottom: 6 }}>Corrected full name</span>
+                  <input
+                    type="text"
+                    value={applicantNameInput}
+                    onChange={(event) => setApplicantNameInput(event.target.value.toUpperCase())}
+                    maxLength={150}
+                    autoFocus
+                    required
+                    aria-label="Corrected applicant full name"
+                    style={{ boxSizing: 'border-box', width: '100%', height: 42, padding: '9px 11px', border: '1px solid #0f766e', borderRadius: 6, background: '#ffffff', color: '#0f172a', fontSize: '0.95rem', fontWeight: 700 }}
+                  />
+                </label>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button
+                    type="submit"
+                    disabled={Boolean(adminActionLoading)}
+                    style={{ height: 42, padding: '0 16px', border: 'none', borderRadius: 6, background: '#0f766e', color: '#ffffff', fontWeight: 800, cursor: adminActionLoading ? 'wait' : 'pointer' }}
+                  >
+                    {adminActionLoading === 'update-applicant-name' ? 'Updating...' : 'Save Name'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setNameEditorOpen(false)}
+                    disabled={Boolean(adminActionLoading)}
+                    style={{ height: 42, padding: '0 14px', border: '1px solid #94a3b8', borderRadius: 6, background: '#ffffff', color: '#334155', fontWeight: 700, cursor: adminActionLoading ? 'wait' : 'pointer' }}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+              <p style={{ margin: '10px 0 0', color: '#475569', fontSize: '0.78rem' }}>
+                Updates identity, PAN verification (when present), CVLKRA, CDSL, NSE, BSE, and the exact PAN/client-code TechExcel row. Signed PDFs and external submissions are not changed.
+              </p>
+            </form>
+          )}
           {adminActionResult && (
             <div style={{ marginTop: 14, borderRadius: 8, border: `1px solid ${adminActionResult.success ? '#86efac' : '#fecaca'}`, background: adminActionResult.success ? '#f0fdf4' : '#fff1f2', color: adminActionResult.success ? '#14532d' : '#991b1b', padding: 12 }}>
               <div style={{ fontWeight: 800, marginBottom: 8 }}>{adminActionResult.success ? 'Admin action saved' : 'Admin action failed'}</div>

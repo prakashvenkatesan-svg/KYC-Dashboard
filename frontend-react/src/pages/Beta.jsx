@@ -508,6 +508,18 @@ const canResetCdslPending = (row) => {
   return Boolean(row?.application_id && row?.cdsl?.id && status && status !== 'pending');
 };
 
+const canResetKraPending = (row) => {
+  const status = String(row?.cvlkra?.status || '').trim().toLowerCase();
+  return Boolean(
+    row?.application_id
+    && row?.cvlkra?.id
+    && status
+    && !['pending', 'retry'].includes(status)
+    && !isStatusSuccess(status)
+    && !hasKraValidated(row)
+  );
+};
+
 const isStatusPendingLike = (status) => {
   const value = String(status || '').toLowerCase();
   return !value || value === '-' || [
@@ -888,6 +900,7 @@ function BetaTable({
   onToggleVisibleRows,
   onClearSelection,
   onOpenNominees,
+  onResetKraPending,
   onResetCdslPending
 }) {
   const filteredRows = useMemo(
@@ -939,6 +952,25 @@ function BetaTable({
     };
   };
 
+  const makeKraResetAction = (row) => {
+    const key = actionKey('cvlkra_reset_pending', row);
+    const loading = pushingKey === key;
+    return {
+      key,
+      label: 'Reset KRA',
+      loadingLabel: 'Resetting...',
+      loading,
+      disabled: Boolean(pushingKey) || !canResetKraPending(row),
+      title: 'Reset this rejected or failed CVLKRA row to Pending. This clears old KRA response fields and does not call integrations.',
+      onClick: () => onResetKraPending(row),
+      style: {
+        background: loading ? '#64748b' : '#475569',
+        borderColor: loading ? '#64748b' : '#334155',
+        boxShadow: loading ? 'none' : '0 2px 8px rgba(71, 85, 105, 0.22)'
+      }
+    };
+  };
+
   const rowActions = (row) => {
     const cdslSuccess = isStatusSuccess(row.cdsl?.status);
     const cdslUploaded = isCdslUploaded(row);
@@ -951,17 +983,23 @@ function BetaTable({
       cdslActions.push(makeCdslResetAction(row));
     }
 
+    const cvlkraActions = directKraFlow
+      ? [
+        makeAction('cvlkra', row, 'Push KRA', 'Submit the CVL KRA entry'),
+        makeAction('cvlkra_status', row, 'Check KRA', 'Fetch final CVL KRA status and update the DB')
+      ]
+      : [
+        makeAction('cvlkra', row, 'Push KRA', 'Submit the fresh CVL KRA entry'),
+        makeAction('cvlkra_document', row, 'Upload Docs', 'Upload KRA PDF/XML documents'),
+        makeAction('cvlkra_status', row, 'Check KRA', 'Fetch final CVL KRA status and update the DB')
+      ];
+
+    if (canResetKraPending(row)) {
+      cvlkraActions.push(makeKraResetAction(row));
+    }
+
     return {
-      cvlkra: directKraFlow
-        ? [
-          makeAction('cvlkra', row, 'Push KRA', 'Submit the CVL KRA entry'),
-          makeAction('cvlkra_status', row, 'Check KRA', 'Fetch final CVL KRA status and update the DB')
-        ]
-        : [
-          makeAction('cvlkra', row, 'Push KRA', 'Submit the fresh CVL KRA entry'),
-          makeAction('cvlkra_document', row, 'Upload Docs', 'Upload KRA PDF/XML documents'),
-          makeAction('cvlkra_status', row, 'Check KRA', 'Fetch final CVL KRA status and update the DB')
-        ],
+      cvlkra: cvlkraActions,
       cdsl: cdslActions,
       nse: [makeAction('nse', row, 'Push NSE', cdslSuccess ? 'Push this record to NSE' : 'CDSL must be success before NSE')],
       bse: [makeAction('bse', row, 'Push BSE', cdslSuccess ? 'Push this record to BSE' : 'CDSL must be success before BSE')],
@@ -1765,6 +1803,26 @@ export default function Beta() {
     }
   };
 
+  const resetKraPending = async (row) => {
+    if (!row?.application_id) return;
+    const label = `${row.pan || row.application_id}`;
+    if (!window.confirm(`Reset CVLKRA to Pending for ${label}? This clears the old KRA response fields and does not call any integration.`)) return;
+
+    const nextPushingKey = `cvlkra_reset_pending:${row.application_id}:${row.pan || ''}`;
+    setPushingKey(nextPushingKey);
+    setResponseCopied(false);
+    setMessage(`Resetting CVLKRA to Pending for ${label}...`);
+    try {
+      const response = await api.post(`/beta/applications/${row.application_id}/cvlkra/reset-pending`, {});
+      await loadEntries();
+      setMessage(JSON.stringify(response, null, 2));
+    } catch (error) {
+      setMessage(error.payload ? JSON.stringify(error.payload, null, 2) : (error.message || `Failed to reset CVLKRA for ${label}.`));
+    } finally {
+      setPushingKey('');
+    }
+  };
+
   return (
     <div className="table-container">
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16, flexWrap: 'wrap', marginBottom: 18 }}>
@@ -1851,6 +1909,7 @@ export default function Beta() {
         onClearSelection={clearSelectedRows}
         flowType="KRA"
         onOpenNominees={openNomineeModal}
+        onResetKraPending={resetKraPending}
         onResetCdslPending={resetCdslPending}
       />
       <BetaTable
@@ -1868,6 +1927,7 @@ export default function Beta() {
         onClearSelection={clearSelectedRows}
         flowType="DigiLocker"
         onOpenNominees={openNomineeModal}
+        onResetKraPending={resetKraPending}
         onResetCdslPending={resetCdslPending}
       />
 

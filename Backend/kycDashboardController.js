@@ -986,12 +986,10 @@ const getBetaEntries = async (req, res) => {
     `;
 
     if (q.trim()) {
-      const qTokens = q
-        .split(/[\n,]+/)
-        .map(token => token.trim())
-        .filter(Boolean);
+      const qTokens = parseBetaSearchTokens(q);
+      const isExactTokenList = qTokens.length > 1 && qTokens.every(token => isExactBetaSearchToken(token.toUpperCase()));
 
-      if (qTokens.length > 1) {
+      if (isExactTokenList) {
         params.push(qTokens.map(token => token.toUpperCase()));
         conditions.push(`(
           UPPER(COALESCE(ka.client_code, cc.client_code, tech."Client_id", '')) = ANY($${params.length})
@@ -1519,6 +1517,7 @@ const getBetaPushTarget = (target) => {
     cvlkra_document: process.env.BETA_CVLKRA_URL || process.env.CVLKRA_CONNECT_URL,
     cvlkra_status: process.env.BETA_CVLKRA_URL || process.env.CVLKRA_CONNECT_URL,
     cdsl: process.env.BETA_CDSL_URL || process.env.CDSL_KYC_URL,
+    cdsl_force: process.env.BETA_CDSL_URL || process.env.CDSL_KYC_URL,
     cdsl_status: process.env.BETA_CDSL_URL || process.env.CDSL_KYC_URL,
     nse: process.env.BETA_NSE_URL || process.env.NSE_CONNECT_URL,
     bse: process.env.BETA_BSE_URL || process.env.BSE_CONNECT_URL,
@@ -1695,6 +1694,17 @@ const BETA_PUSH_BLOCKED_PANS = new Set([
 
 const normalizePan = (value) => String(value || '').trim().toUpperCase();
 
+const isExactBetaSearchToken = (token) => (
+  /^[A-Z]{5}[0-9]{4}[A-Z]$/.test(token) ||
+  /^[A-Z][0-9]{5,}$/.test(token) ||
+  /^[0-9]+$/.test(token)
+);
+
+const parseBetaSearchTokens = (value) => String(value || '')
+  .split(/[\s,;]+/)
+  .map(token => token.trim())
+  .filter(Boolean);
+
 const getBlockedPansFromPushRequest = ({ pan, payload }) => {
   const candidatePans = new Set();
   const addPan = value => {
@@ -1718,7 +1728,7 @@ const pushBetaEntry = async (req, res) => {
     }
 
     const { normalized, url } = getBetaPushTarget(target);
-    const allowedTargets = ['orchestrator', 'cvlkra', 'cvlkra_document', 'cvlkra_status', 'cdsl', 'cdsl_status', 'nse', 'bse', 'techexcel', 'techexcel_force'];
+    const allowedTargets = ['orchestrator', 'cvlkra', 'cvlkra_document', 'cvlkra_status', 'cdsl', 'cdsl_force', 'cdsl_status', 'nse', 'bse', 'techexcel', 'techexcel_force'];
     if (!allowedTargets.includes(normalized)) {
       return res.status(400).json({ success: false, message: "Unsupported push target." });
     }

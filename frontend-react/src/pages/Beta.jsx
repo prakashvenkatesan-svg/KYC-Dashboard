@@ -566,6 +566,7 @@ const pushLabel = (target) => ({
   cvlkra_document: 'Doc Push',
   cvlkra_status: 'Check KRA',
   cdsl: 'CDSL Push',
+  cdsl_force: 'Force CDSL',
   cdsl_status: 'CDSL Check',
   nse: 'NSE Push',
   bse: 'BSE Push',
@@ -578,6 +579,7 @@ const loadingLabel = (target) => ({
   cvlkra_document: 'Uploading docs...',
   cvlkra_status: 'Checking KRA...',
   cdsl: 'Pushing CDSL...',
+  cdsl_force: 'Force pushing CDSL...',
   cdsl_status: 'Checking CDSL...',
   nse: 'Pushing NSE...',
   bse: 'Pushing BSE...',
@@ -585,13 +587,24 @@ const loadingLabel = (target) => ({
   techexcel_force: 'Force pushing TechExcel...'
 }[target] || 'Loading...');
 
+const isExactSearchToken = (token) => (
+  /^[A-Z]{5}[0-9]{4}[A-Z]$/.test(token) ||
+  /^[A-Z][0-9]{5,}$/.test(token) ||
+  /^[0-9]+$/.test(token)
+);
+
+const parseSearchTokens = (query) => String(query || '')
+  .split(/[\s,;]+/)
+  .map(token => token.trim())
+  .filter(Boolean);
+
 const includesText = (row, query) => {
   if (!query) return true;
-  const tokens = query
-    .split(/[\n,]+/)
-    .map(token => token.trim().toLowerCase())
-    .filter(Boolean);
-  const needles = tokens.length > 1 ? tokens : [query.trim().toLowerCase()].filter(Boolean);
+  const rawTokens = parseSearchTokens(query);
+  const isExactTokenList = rawTokens.length > 1 && rawTokens.every(token => isExactSearchToken(token.toUpperCase()));
+  const needles = isExactTokenList
+    ? rawTokens.map(token => token.toLowerCase())
+    : [query.trim().toLowerCase()].filter(Boolean);
   const exactFields = [
     row.pan,
     row.client_code,
@@ -609,7 +622,7 @@ const includesText = (row, query) => {
     row.xml_status
   ];
 
-  if (tokens.length > 1) {
+  if (isExactTokenList) {
     return needles.some(needle => exactFields.includes(needle));
   }
 
@@ -621,6 +634,7 @@ const includesText = (row, query) => {
 const targetDisabledReason = (target, row) => {
   const cdslSuccess = isStatusSuccess(row.cdsl?.status);
   const cdslUploaded = isCdslUploaded(row);
+  const kraSuccess = isStatusSuccess(row.cvlkra?.status) || hasKraValidated(row);
   const directKraFlow = row.flow_type === 'KRA';
   const cvlkraStatus = String(row.cvlkra?.status || '').toLowerCase();
 
@@ -663,6 +677,13 @@ const targetDisabledReason = (target, row) => {
   }
 
   if (target === 'cdsl') {
+    if (isStatusSuccess(row.cdsl?.status)) return 'CDSL is already success';
+    if (cdslUploaded) return 'Use CDSL Check for uploaded rows';
+    if (row.flow_type === 'DigiLocker' && !kraSuccess) return 'KRA must be success before CDSL';
+    return '';
+  }
+
+  if (target === 'cdsl_force') {
     if (isStatusSuccess(row.cdsl?.status)) return 'CDSL is already success';
     if (cdslUploaded) return 'Use CDSL Check for uploaded rows';
     return '';
@@ -977,7 +998,16 @@ function BetaTable({
     const directKraFlow = row.flow_type === 'KRA';
     const cdslActions = cdslUploaded
       ? [makeAction('cdsl_status', row, 'Check CDSL', 'Download and apply the final CDSL response')]
-      : [makeAction('cdsl', row, 'Push CDSL', 'Push this record to CDSL')];
+      : [
+        makeAction('cdsl', row, 'Push CDSL', 'Push this record to CDSL'),
+        makeAction('cdsl_force', row, 'Force CDSL', 'Push CDSL even when KRA is not successful', {
+          style: {
+            background: '#dc2626',
+            borderColor: '#b91c1c',
+            boxShadow: '0 2px 8px rgba(220, 38, 38, 0.28)'
+          }
+        })
+      ];
 
     if (canResetCdslPending(row)) {
       cdslActions.push(makeCdslResetAction(row));
@@ -1693,7 +1723,7 @@ export default function Beta() {
         pan: firstRow.pan,
         payload
       });
-      if (target === 'cdsl' || target === 'cdsl_status') {
+      if (target === 'cdsl' || target === 'cdsl_force' || target === 'cdsl_status') {
         setRowOverrides(current => {
           const next = { ...current };
           rows.forEach(row => {
@@ -1763,7 +1793,7 @@ export default function Beta() {
         pan: row.pan,
         ...(payload ? { payload } : {})
       });
-      if (target === 'cdsl' || target === 'cdsl_status') {
+      if (target === 'cdsl' || target === 'cdsl_force' || target === 'cdsl_status') {
         setRowOverrides(current => ({
           ...current,
           [getRowKey(row)]: markCdslWaitingOverride(row)

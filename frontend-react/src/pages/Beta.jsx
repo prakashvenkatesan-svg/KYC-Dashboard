@@ -710,8 +710,8 @@ const targetDisabledReason = (target, row) => {
 
 const batchTargetsForFlow = (flowType) => (
   flowType === 'KRA'
-    ? ['cvlkra', 'cvlkra_status', 'cdsl', 'cdsl_status', 'nse', 'bse', 'techexcel', 'techexcel_force']
-    : ['cvlkra', 'cvlkra_document', 'cvlkra_status', 'cdsl', 'cdsl_status', 'nse', 'bse', 'techexcel', 'techexcel_force']
+    ? ['cvlkra', 'cvlkra_status', 'cdsl', 'cdsl_force', 'cdsl_status', 'nse', 'bse', 'techexcel', 'techexcel_force']
+    : ['cvlkra', 'cvlkra_document', 'cvlkra_status', 'cdsl', 'cdsl_force', 'cdsl_status', 'nse', 'bse', 'techexcel', 'techexcel_force']
 );
 
 const pushConfirmationText = (target, rows, label, skippedCount = 0) => {
@@ -722,8 +722,11 @@ const pushConfirmationText = (target, rows, label, skippedCount = 0) => {
   const mismatchWarning = ['cvlkra', 'cvlkra_document'].includes(target) && mismatchCount
     ? `\n\nWarning: ${mismatchCount} row(s) have a name mismatch with Income Tax. This admin action will proceed despite that mismatch. Confirm the client details before continuing.`
     : '';
+  const forceCdslWarning = target === 'cdsl_force'
+    ? '\n\nWarning: Force CDSL bypasses the DigiLocker KRA-success gate. Use only when compliance has approved the exception.'
+    : '';
 
-  return `Push ${label}?${skipText}${mismatchWarning}`;
+  return `Push ${label}?${skipText}${mismatchWarning}${forceCdslWarning}`;
 };
 
 const nomineeIssuePattern = /(nominee|nomination|sum of percentage|percentage of shares|allocation percentage|minor flag|relationship with bo|exact relationship)/i;
@@ -1683,6 +1686,20 @@ export default function Beta() {
       };
     }
 
+    if (target === 'cdsl_force') {
+      return {
+        mode: 'process',
+        applicationIds,
+        pans,
+        limit: rows.length,
+        forcePush: true,
+        skipKraCheck: true,
+        bypassKraCheck: true,
+        allowKraFailure: true,
+        source: 'kyc-dashboard-beta-force-cdsl'
+      };
+    }
+
     if (target === 'techexcel_force') {
       return {
         mode: 'process',
@@ -1774,6 +1791,18 @@ export default function Beta() {
               minAgeMinutes: 0,
               forceDownload: true
             }
+            : target === 'cdsl_force'
+              ? {
+                mode: 'process',
+                applicationIds: [row.application_id],
+                pans: row.pan ? [row.pan] : [],
+                limit: 1,
+                forcePush: true,
+                skipKraCheck: true,
+                bypassKraCheck: true,
+                allowKraFailure: true,
+                source: 'kyc-dashboard-beta-force-cdsl'
+              }
             : target === 'techexcel_force'
               ? {
                 mode: 'process',

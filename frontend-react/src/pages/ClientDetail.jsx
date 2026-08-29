@@ -435,15 +435,10 @@ export default function ClientDetail() {
       setAdminActionResult({ success: false, data: { message: 'Enter the complete corrected applicant name.' } });
       return;
     }
-    if (newName === currentName) {
-      setAdminActionResult({ success: false, data: { message: 'The new name is the same as the current name.' } });
-      return;
-    }
-
     const confirmed = window.confirm(
       `Change applicant name for application ${applicationId}${cleanPan ? ` / ${cleanPan}` : ''}?\n\n` +
       `Current: ${currentName}\nNew: ${newName}\n\n` +
-      'This updates application-scoped database rows only. It does not change the signed PDF or records already submitted to external integrations.'
+      'This updates application-scoped database rows and can also re-sync hidden PDF source names. It does not change the signed PDF or records already submitted to external integrations.'
     );
     if (!confirmed) return;
 
@@ -686,7 +681,7 @@ export default function ClientDetail() {
                 </div>
               </div>
               <p style={{ margin: '10px 0 0', color: '#475569', fontSize: '0.78rem' }}>
-                Updates identity, PAN verification (when present), CVLKRA, CDSL, NSE, BSE, and the exact PAN/client-code TechExcel row. Signed PDFs and external submissions are not changed.
+                Updates identity, PAN verification/PAN KYC status (when present), DigiLocker name, CVLKRA, CDSL, NSE, BSE, and the exact PAN/client-code TechExcel row. Signed PDFs and external submissions are not changed.
               </p>
             </form>
           )}

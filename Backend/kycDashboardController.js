@@ -1572,6 +1572,15 @@ const buildDefaultBetaPushPayload = ({ target, applicationId, pan }) => {
     };
   }
 
+  if (target === 'cdsl_force') {
+    return withCdslForceFlags({
+      mode: 'process',
+      applicationIds: [applicationId],
+      pans: pan ? [pan] : [],
+      limit: 1
+    });
+  }
+
   if (target === 'orchestrator') {
     return {
       mode: 'process',
@@ -1596,6 +1605,115 @@ const withTechExcelForceFlags = (payload) => ({
   allowCdslFailure: true,
   source: payload?.source || 'kyc-dashboard-beta-force-push'
 });
+
+const withCdslForceFlags = (payload) => ({
+  ...payload,
+  forcePush: true,
+  skipKraCheck: true,
+  bypassKraCheck: true,
+  allowKraFailure: true,
+  source: payload?.source || 'kyc-dashboard-beta-force-cdsl'
+});
+
+const toPositiveIntegerArray = (value) => {
+  const values = Array.isArray(value) ? value : [value];
+  return values
+    .map(item => parseInt(item, 10))
+    .filter(item => Number.isInteger(item) && item > 0);
+};
+
+const getBetaPushApplicationIds = ({ applicationId, payload }) => {
+  const ids = [
+    ...toPositiveIntegerArray(applicationId),
+    ...toPositiveIntegerArray(payload?.applicationId),
+    ...toPositiveIntegerArray(payload?.application_id),
+    ...toPositiveIntegerArray(payload?.applicationIds)
+  ];
+  return [...new Set(ids)];
+};
+
+const betaKraSuccessText = (row) => [
+  row?.cvlkra_status,
+  row?.cvlkra_error,
+  row?.cvlkra_remarks,
+  row?.cvlkra_error_code,
+  row?.cvlkra_response_text
+].filter(Boolean).join(' ').toLowerCase().replace(/_/g, ' ');
+
+const isBetaKraSuccessForCdsl = (row) => {
+  const status = String(row?.cvlkra_status || '').trim().toLowerCase().replace(/_/g, ' ');
+  if (['success', 's', 'passed', 'kra valid', 'kra validated', 'validated', 'kra accepted'].includes(status)) {
+    return true;
+  }
+
+  const text = betaKraSuccessText(row);
+  return (
+    text.includes('kra validated') ||
+    text.includes('new kyc validated') ||
+    text.includes('final cvlkra kyc status: validated') ||
+    text.includes('final cvlkra kyc status: kra validated')
+  );
+};
+
+const assertBetaCdslKraGate = async ({ applicationIds }) => {
+  if (!applicationIds.length) return null;
+
+  const { rows } = await pool.query(`
+    SELECT
+      ka.id AS application_id,
+      COALESCE(NULLIF(iv.pan_number, ''), NULLIF(cvl.app_pan_no, ''), '') AS pan,
+      CASE
+        WHEN (
+          digi.id IS NOT NULL
+          OR LOWER(COALESCE(iv.provider, '')) = 'digilocker'
+          OR LOWER(COALESCE(digi.provider, '')) = 'digilocker'
+          OR COALESCE(cvl.app_kyc_mode, '') = '5'
+          OR COALESCE(cvl.aadhaar_xml_s3_key, '') <> ''
+        ) THEN true
+        ELSE false
+      END AS has_digilocker_flow,
+      cvl.sync_status AS cvlkra_status,
+      cvl.error_description AS cvlkra_error,
+      COALESCE(
+        CASE WHEN LEFT(BTRIM(cvl.api_response_payload::text), 1) = '{' THEN cvl.api_response_payload::jsonb #>> '{final_status_response,resdtls,KYC_DATA,APP_REMARKS}' END,
+        CASE WHEN LEFT(BTRIM(cvl.api_response_payload::text), 1) = '{' THEN cvl.api_response_payload::jsonb #>> '{final_status_response,resdtls,KYCDATA,APP_REMARKS}' END,
+        CASE WHEN LEFT(BTRIM(cvl.api_response_payload::text), 1) = '{' THEN cvl.api_response_payload::jsonb #>> '{resdtls,KYC_DATA,APP_REMARKS}' END,
+        CASE WHEN LEFT(BTRIM(cvl.api_response_payload::text), 1) = '{' THEN cvl.api_response_payload::jsonb #>> '{resdtls,KYCDATA,APP_REMARKS}' END
+      ) AS cvlkra_remarks,
+      COALESCE(
+        CASE WHEN LEFT(BTRIM(cvl.api_response_payload::text), 1) = '{' THEN cvl.api_response_payload::jsonb #>> '{final_status_response,resdtls,KYC_DATA,APP_ERROR_DESC}' END,
+        CASE WHEN LEFT(BTRIM(cvl.api_response_payload::text), 1) = '{' THEN cvl.api_response_payload::jsonb #>> '{final_status_response,resdtls,KYCDATA,APP_ERROR_DESC}' END,
+        CASE WHEN LEFT(BTRIM(cvl.api_response_payload::text), 1) = '{' THEN cvl.api_response_payload::jsonb #>> '{resdtls,KYC_DATA,APP_ERROR_DESC}' END,
+        CASE WHEN LEFT(BTRIM(cvl.api_response_payload::text), 1) = '{' THEN cvl.api_response_payload::jsonb #>> '{resdtls,KYCDATA,APP_ERROR_DESC}' END
+      ) AS cvlkra_error_code,
+      LEFT(COALESCE(cvl.api_response_payload::text, ''), 20000) AS cvlkra_response_text
+    FROM public.kyc_applications ka
+    LEFT JOIN public.identity_verifications iv ON iv.application_id = ka.id
+    LEFT JOIN public.digilocker_details digi ON digi.application_id = ka.id::text
+    LEFT JOIN LATERAL (
+      SELECT *
+      FROM public.cvlkra_data
+      WHERE application_id = ka.id
+      ORDER BY updated_at DESC NULLS LAST, id DESC
+      LIMIT 1
+    ) cvl ON true
+    WHERE ka.id = ANY($1::int[])
+  `, [applicationIds]);
+
+  const blockedRows = rows.filter(row => row.has_digilocker_flow && !isBetaKraSuccessForCdsl(row));
+  if (!blockedRows.length) return null;
+
+  return {
+    success: false,
+    message: "CDSL Push blocked. DigiLocker flow requires successful KRA before CDSL. Use Force CDSL only for approved exceptions.",
+    blockedApplications: blockedRows.map(row => ({
+      application_id: row.application_id,
+      pan: row.pan,
+      cvlkra_status: row.cvlkra_status || null,
+      cvlkra_error: row.cvlkra_error || row.cvlkra_remarks || row.cvlkra_error_code || null
+    }))
+  };
+};
 
 const parseJsonIfString = (value) => {
   if (typeof value !== 'string') return value;
@@ -1745,13 +1863,29 @@ const pushBetaEntry = async (req, res) => {
     const requestedPayload = payload && typeof payload === 'object'
       ? payload
       : buildDefaultBetaPushPayload({ target: normalized, applicationId: appId, pan });
+
+    if (normalized === 'cdsl') {
+      const gateFailure = await assertBetaCdslKraGate({
+        applicationIds: getBetaPushApplicationIds({ applicationId: appId, payload: requestedPayload })
+      });
+      if (gateFailure) {
+        return res.status(409).json({
+          ...gateFailure,
+          target: normalized,
+          requestPayload: requestedPayload
+        });
+      }
+    }
+
     const finalPayload = normalized === 'techexcel_force'
       ? withTechExcelForceFlags(requestedPayload)
-      : normalized === 'cvlkra'
-        ? { ...requestedPayload, forceRepush: true, allowNameMismatchUpdate: true }
-        : normalized === 'cvlkra_document'
-          ? { ...requestedPayload, allowNameMismatchUpdate: true }
-          : requestedPayload;
+      : normalized === 'cdsl_force'
+        ? withCdslForceFlags(requestedPayload)
+        : normalized === 'cvlkra'
+          ? { ...requestedPayload, forceRepush: true, allowNameMismatchUpdate: true }
+          : normalized === 'cvlkra_document'
+            ? { ...requestedPayload, allowNameMismatchUpdate: true }
+            : requestedPayload;
 
     if (!url) {
       return res.status(501).json({

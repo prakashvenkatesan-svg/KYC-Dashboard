@@ -591,6 +591,7 @@ const markCdslWaitingOverride = (row) => ({
 const pushLabel = (target) => ({
   cvlkra: 'KRA Push',
   cvlkra_document: 'Doc Push',
+  cvlkra_sftp: 'SFTP Push',
   cvlkra_status: 'Check KRA',
   cdsl: 'CDSL Push',
   cdsl_force: 'Force CDSL',
@@ -604,6 +605,7 @@ const pushLabel = (target) => ({
 const loadingLabel = (target) => ({
   cvlkra: 'Pushing KRA...',
   cvlkra_document: 'Uploading docs...',
+  cvlkra_sftp: 'Uploading SFTP...',
   cvlkra_status: 'Checking KRA...',
   cdsl: 'Pushing CDSL...',
   cdsl_force: 'Force pushing CDSL...',
@@ -689,6 +691,16 @@ const targetDisabledReason = (target, row) => {
     return '';
   }
 
+  if (target === 'cvlkra_sftp') {
+    if (isInternalTestPan(row.pan)) return 'Push blocked: internal/test PAN';
+    if (isBlockedPushPan(row.pan)) return 'Push blocked: KYC team completed KRA manually for this PAN';
+    if (hasRecentModifyUnderProcess(row)) return 'Push blocked: Modify KYC already under process after July 2026';
+    if (directKraFlow) return 'Not needed for direct KRA flow';
+    if (hasKraValidated(row)) return 'KRA is already validated; SFTP upload is not needed';
+    if (!row.cvlkra?.id && !row.cvlkra?.status) return 'No CVL KRA row/status available for SFTP upload';
+    return '';
+  }
+
   if (target === 'cvlkra_status') {
     if (isInternalTestPan(row.pan)) return 'Internal/test PAN hidden from operational status checks';
     if (!row.cvlkra?.status) return 'No CVL KRA row/status available to check';
@@ -738,7 +750,7 @@ const targetDisabledReason = (target, row) => {
 const batchTargetsForFlow = (flowType) => (
   flowType === 'KRA'
     ? ['cvlkra', 'cvlkra_status', 'cdsl', 'cdsl_force', 'cdsl_status', 'nse', 'bse', 'techexcel', 'techexcel_force']
-    : ['cvlkra', 'cvlkra_document', 'cvlkra_status', 'cdsl', 'cdsl_force', 'cdsl_status', 'nse', 'bse', 'techexcel', 'techexcel_force']
+    : ['cvlkra', 'cvlkra_document', 'cvlkra_sftp', 'cvlkra_status', 'cdsl', 'cdsl_force', 'cdsl_status', 'nse', 'bse', 'techexcel', 'techexcel_force']
 );
 
 const pushConfirmationText = (target, rows, label, skippedCount = 0) => {
@@ -746,7 +758,7 @@ const pushConfirmationText = (target, rows, label, skippedCount = 0) => {
   const skipText = skippedCount
     ? ` ${skippedCount} selected row(s) are not eligible and will be skipped.`
     : '';
-  const mismatchWarning = ['cvlkra', 'cvlkra_document'].includes(target) && mismatchCount
+  const mismatchWarning = ['cvlkra', 'cvlkra_document', 'cvlkra_sftp'].includes(target) && mismatchCount
     ? `\n\nWarning: ${mismatchCount} row(s) have a name mismatch with Income Tax. This admin action will proceed despite that mismatch. Confirm the client details before continuing.`
     : '';
   const forceCdslWarning = target === 'cdsl_force'
@@ -1051,6 +1063,7 @@ function BetaTable({
       : [
         makeAction('cvlkra', row, 'Push KRA', 'Submit the fresh CVL KRA entry'),
         makeAction('cvlkra_document', row, 'Upload Docs', 'Upload KRA PDF/XML documents'),
+        makeAction('cvlkra_sftp', row, 'SFTP Push', 'Upload KRA PDF/XML to the current-date CVLKRA SFTP folder'),
         makeAction('cvlkra_status', row, 'Check KRA', 'Fetch final CVL KRA status and update the DB')
       ];
 
@@ -1693,6 +1706,17 @@ export default function Beta() {
       };
     }
 
+    if (target === 'cvlkra_sftp') {
+      return {
+        mode: 'sftpOnly',
+        applicationIds,
+        pans,
+        limit: rows.length,
+        uploadContext: 'normal',
+        reconcileFinalStatus: false
+      };
+    }
+
     if (target === 'cvlkra_status') {
       return {
         mode: 'kraStatus',
@@ -1809,6 +1833,13 @@ export default function Beta() {
             reconcileFinalStatus: true,
             allowNameMismatchUpdate: true
           }
+          : target === 'cvlkra_sftp'
+            ? {
+              mode: 'sftpOnly',
+              applicationId: row.application_id,
+              uploadContext: 'normal',
+              reconcileFinalStatus: false
+            }
           : target === 'cdsl_status'
             ? {
               mode: 'uploadedStatus',

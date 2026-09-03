@@ -9,6 +9,21 @@ const getAuthHeaders = () => {
   };
 };
 
+const getApiUrl = (path) => {
+  if (/^https?:\/\//i.test(path)) return path;
+  const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+  const basePath = '/admin/kyc-dashboard';
+  if (normalizedPath.startsWith(`${basePath}/`)) {
+    return `${API_BASE_URL}${normalizedPath.slice(basePath.length)}`;
+  }
+  return `${API_BASE_URL}${normalizedPath}`;
+};
+
+const getFileNameFromDisposition = (disposition) => {
+  const match = String(disposition || '').match(/filename\*?=(?:UTF-8'')?"?([^";]+)"?/i);
+  return match ? decodeURIComponent(match[1]) : '';
+};
+
 const parseApiResponse = async (res, fallbackMessage) => {
   const contentType = res.headers.get('content-type') || '';
 
@@ -361,6 +376,36 @@ const api = {
       throw error;
     }
     return data;
+  },
+  downloadBetaXml: async (downloadPath, fallbackFileName = 'aadhaar_xml.xml') => {
+    const headers = getAuthHeaders();
+    delete headers['Content-Type'];
+
+    const res = await fetch(getApiUrl(downloadPath), { headers });
+    if (res.status === 401) {
+      localStorage.removeItem('kyc_auth_token');
+      window.location.href = '/login';
+      return;
+    }
+    if (!res.ok) {
+      const data = await parseApiResponse(res, 'Failed to download XML.');
+      const error = new Error(data?.message || data?.error || 'Failed to download XML.');
+      error.payload = data;
+      throw error;
+    }
+
+    const blob = await res.blob();
+    const fileName = getFileNameFromDisposition(res.headers.get('content-disposition')) || fallbackFileName;
+    const objectUrl = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = objectUrl;
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(objectUrl);
+
+    return { success: true, fileName };
   },
   
   // Generic methods for User Management (and others)

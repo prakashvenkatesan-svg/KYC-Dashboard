@@ -386,6 +386,7 @@ const xmlCell = (row) => {
   if (!xml) return badge(row.xml_status);
 
   const hasSignatureCount = xml.signatureCount !== null && xml.signatureCount !== undefined;
+  const downloadUrl = xml.downloadUrl || xml.download_url;
   const detail = [
     xml.rootName ? `root: ${xml.rootName}` : '',
     hasSignatureCount ? `signatures: ${xml.signatureCount}` : '',
@@ -410,6 +411,32 @@ const xmlCell = (row) => {
         <div style={{ color: 'var(--text-muted)', fontSize: '0.72rem', lineHeight: 1.25 }}>
           Till {formatXmlDate(xml.validUntil)}
         </div>
+      ) : null}
+      {downloadUrl ? (
+        <button
+          type="button"
+          className="beta-secondary-btn"
+          onClick={async (event) => {
+            event.stopPropagation();
+            try {
+              await api.downloadBetaXml(
+                downloadUrl,
+                `${String(row.pan || `application_${row.application_id}`).trim().toUpperCase()}_aadhaar_xml.xml`
+              );
+            } catch (error) {
+              window.alert(error.message || 'Failed to download XML.');
+            }
+          }}
+          style={{
+            marginTop: 2,
+            padding: '4px 8px',
+            minHeight: 28,
+            fontSize: '0.72rem',
+            lineHeight: 1.1
+          }}
+        >
+          Download XML
+        </button>
       ) : null}
     </div>
   );

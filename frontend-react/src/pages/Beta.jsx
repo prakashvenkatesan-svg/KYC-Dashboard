@@ -750,7 +750,7 @@ const targetDisabledReason = (target, row) => {
 const batchTargetsForFlow = (flowType) => (
   flowType === 'KRA'
     ? ['cvlkra', 'cvlkra_status', 'cdsl', 'cdsl_force', 'cdsl_status', 'nse', 'bse', 'techexcel', 'techexcel_force']
-    : ['cvlkra', 'cvlkra_document', 'cvlkra_sftp', 'cvlkra_status', 'cdsl', 'cdsl_force', 'cdsl_status', 'nse', 'bse', 'techexcel', 'techexcel_force']
+    : ['cvlkra', 'cvlkra_sftp', 'cvlkra_status', 'cdsl', 'cdsl_force', 'cdsl_status', 'nse', 'bse', 'techexcel', 'techexcel_force']
 );
 
 const pushConfirmationText = (target, rows, label, skippedCount = 0) => {
@@ -1062,7 +1062,6 @@ function BetaTable({
       ]
       : [
         makeAction('cvlkra', row, 'Push KRA', 'Submit the fresh CVL KRA entry'),
-        makeAction('cvlkra_document', row, 'Upload Docs', 'Upload KRA PDF/XML documents'),
         makeAction('cvlkra_sftp', row, 'SFTP Push', 'Upload KRA PDF/XML to the current-date CVLKRA SFTP folder'),
         makeAction('cvlkra_status', row, 'Check KRA', 'Fetch final CVL KRA status and update the DB')
       ];
